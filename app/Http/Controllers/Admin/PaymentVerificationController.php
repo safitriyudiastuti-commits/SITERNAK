@@ -10,6 +10,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -19,7 +20,7 @@ class PaymentVerificationController extends Controller
     {
         $payments = Payment::with('order.buyer', 'order.store')
             ->when($request->filled('status'), fn ($query) => $query->where('status', $request->string('status')))
-            ->whereIn('method', ['transfer_manual', 'qris'])
+            ->where('method', 'transfer_manual')
             ->latest()->paginate(15)->withQueryString();
 
         return view('admin.verifikasi-pembayaran.index', compact('payments'));
@@ -32,7 +33,8 @@ class PaymentVerificationController extends Controller
 
     public function update(VerifyPaymentRequest $request, Payment $payment): RedirectResponse
     {
-        abort_unless($payment->method === 'transfer_manual' || $payment->method === 'qris', 422);
+        abort_unless($payment->method === 'transfer_manual', 422);
+        abort_unless($payment->status === 'under_review', 409, 'Pembayaran ini sudah diproses atau belum menunggu verifikasi.');
         $decision = $request->string('decision')->toString();
         $note = $request->input('verification_note');
 
@@ -43,7 +45,31 @@ class PaymentVerificationController extends Controller
                 'verified_by' => $request->user()->id,
                 'verified_at' => now(),
             ]);
-            $payment->order()->update(['status' => $decision === 'paid' ? 'paid' : 'awaiting_payment']);
+            $order = $payment->order()->lockForUpdate()->firstOrFail();
+            if ($decision === 'paid') {
+                foreach ($order->items as $item) {
+                    if ($item->livestock_id) {
+                        $livestock = \App\Models\Livestock::whereKey($item->livestock_id)->lockForUpdate()->firstOrFail();
+                        if ($livestock->stock < $item->quantity) {
+                            throw ValidationException::withMessages(['decision' => 'Stok ternak tidak mencukupi untuk pesanan ini.']);
+                        }
+                        $livestock->decrement('stock', $item->quantity);
+                        if ($livestock->sale_mode === 'individual') {
+                            $livestock->update(['status' => 'sold']);
+                        }
+                    } elseif ($item->product_id) {
+                        $product = \App\Models\Product::whereKey($item->product_id)->lockForUpdate()->firstOrFail();
+                        if ($product->stock < $item->quantity) {
+                            throw ValidationException::withMessages(['decision' => 'Stok hasil ternak tidak mencukupi untuk pesanan ini.']);
+                        }
+                        $product->decrement('stock', $item->quantity);
+                        if ($product->fresh()->stock <= 0) {
+                            $product->update(['status' => 'out_of_stock']);
+                        }
+                    }
+                }
+            }
+            $order->update(['status' => $decision === 'paid' ? 'paid' : 'awaiting_payment']);
 
             AuditLog::create([
                 'admin_id' => $request->user()->id,

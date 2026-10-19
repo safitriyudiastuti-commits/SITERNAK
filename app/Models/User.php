@@ -7,10 +7,11 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Notifications\Notifiable;
 
-#[Fillable(['name', 'email', 'password', 'role', 'phone', 'city', 'address'])]
-#[Hidden(['password', 'remember_token'])]
+#[Fillable(['name', 'email', 'password', 'role', 'phone', 'city', 'district', 'province', 'address', 'identity_number'])]
+#[Hidden(['password', 'remember_token', 'identity_number'])]
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
@@ -27,5 +28,15 @@ class User extends Authenticatable
     public function isAdmin(): bool
     {
         return $this->role === 'admin';
+    }
+
+    public function store(): HasOne
+    {
+        return $this->hasOne(Store::class);
+    }
+
+    public function hasApprovedStore(): bool
+    {
+        return $this->store()->where('status', 'approved')->exists();
     }
 }

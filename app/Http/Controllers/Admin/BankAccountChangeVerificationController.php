@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\VerifyBankAccountChangeRequest;
 use App\Models\AuditLog;
 use App\Models\BankAccountChangeRequest as BankChange;
+use App\Models\StoreBankAccount;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -43,6 +44,22 @@ class BankAccountChangeVerificationController extends Controller
             ]);
 
             if ($decision === 'approved') {
+                StoreBankAccount::where('store_id', $bankAccountChangeRequest->store_id)
+                    ->where('is_primary', true)
+                    ->update(['is_primary' => false]);
+
+                StoreBankAccount::create([
+                    'store_id' => $bankAccountChangeRequest->store_id,
+                    'bank_name' => $bankAccountChangeRequest->bank_name,
+                    'account_number' => $bankAccountChangeRequest->account_number,
+                    'account_holder' => $bankAccountChangeRequest->account_holder,
+                    'supporting_document_path' => $bankAccountChangeRequest->supporting_document_path,
+                    'is_primary' => true,
+                    'status' => 'active',
+                    'verified_by' => $request->user()->id,
+                    'verified_at' => now(),
+                ]);
+
                 $bankAccountChangeRequest->store()->update([
                     'bank_name' => $bankAccountChangeRequest->bank_name,
                     'bank_account_number' => $bankAccountChangeRequest->account_number,

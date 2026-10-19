@@ -38,6 +38,8 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::post('/data-induk', [MasterDataController::class, 'store'])->name('master-data.store');
     Route::put('/data-induk/{category}', [MasterDataController::class, 'update'])->name('master-data.update');
     Route::delete('/data-induk/{category}', [MasterDataController::class, 'destroy'])->name('master-data.destroy');
+    Route::put('/data-induk/jenis/{breed}', [MasterDataController::class, 'updateBreed'])->name('master-data.breeds.update');
+    Route::patch('/data-induk/jenis/{breed}/nonaktif', [MasterDataController::class, 'disableBreed'])->name('master-data.breeds.disable');
 
     Route::get('/laporan', [ReportController::class, 'index'])->name('reports.index');
     Route::get('/laporan/ekspor', [ReportController::class, 'export'])->name('reports.export');

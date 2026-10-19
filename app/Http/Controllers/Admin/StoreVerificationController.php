@@ -17,12 +17,13 @@ class StoreVerificationController extends Controller
 {
     public function index(Request $request): View
     {
-        $stores = Store::with('owner')
+        $stores = Store::with('owner', 'documents')
             ->when($request->filled('status'), fn ($query) => $query->where('status', $request->string('status')))
             ->when($request->filled('search'), fn ($query) => $query->where(fn ($inner) => $inner
                 ->where('name', 'like', '%'.$request->string('search').'%')
                 ->orWhere('city', 'like', '%'.$request->string('search').'%')
-                ->orWhere('regency', 'like', '%'.$request->string('search').'%')))
+                ->orWhere('regency', 'like', '%'.$request->string('search').'%')
+                ->orWhere('province', 'like', '%'.$request->string('search').'%')))
             ->latest()->paginate(15)->withQueryString();
 
         return view('admin.verifikasi-toko.index', compact('stores'));
@@ -45,15 +46,17 @@ class StoreVerificationController extends Controller
         ]);
 
         $store->documents()->update(['status' => $decision, 'review_note' => $note]);
-        if ($decision === 'approved') {
-            $store->owner()->update(['role' => 'seller']);
-        }
         AuditLog::create([
             'admin_id' => $request->user()->id,
             'action' => 'store_'.$decision,
             'subject_type' => Store::class,
             'subject_id' => $store->id,
             'description' => $note ?? 'Verifikasi toko '.$decision,
+            'metadata' => [
+                'check_ktp' => $request->boolean('check_ktp'),
+                'check_location' => $request->boolean('check_location'),
+                'check_bank_document' => $request->boolean('check_bank_document'),
+            ],
         ]);
 
         return redirect()->route('admin.stores.show', $store)->with('status', 'Keputusan verifikasi toko disimpan.');

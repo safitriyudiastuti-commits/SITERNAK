@@ -14,6 +14,9 @@ class VerifyStoreRequest extends FormRequest
         return [
             'decision' => ['required', Rule::in(['approved', 'rejected'])],
             'review_note' => ['required_if:decision,rejected', 'nullable', 'string', 'max:2000'],
+            'check_ktp' => ['required_if:decision,approved', 'accepted'],
+            'check_location' => ['required_if:decision,approved', 'accepted'],
+            'check_bank_document' => ['required_if:decision,approved', 'accepted'],
         ];
     }
 }

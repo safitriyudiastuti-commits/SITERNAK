@@ -37,6 +37,9 @@ class MasterDataController extends Controller
                 'category_id' => $data['category_id'],
                 'name' => $data['name'],
                 'is_active' => $request->boolean('is_active', true),
+                'sale_modes' => $data['sale_modes'],
+                'purposes' => $data['purposes'] ?? [],
+                'dynamic_fields' => $data['dynamic_fields'] ?? [],
             ]);
         } elseif ($kind === 'contest') {
             ContestCategory::create([
@@ -80,5 +83,29 @@ class MasterDataController extends Controller
         AuditLog::create(['admin_id' => request()->user()->id, 'action' => 'master_data_disabled', 'subject_type' => Category::class, 'subject_id' => $category->id, 'description' => 'Kategori dinonaktifkan.']);
 
         return back()->with('status', 'Kategori dinonaktifkan.');
+    }
+
+    public function updateBreed(MasterDataRequest $request, Breed $breed): RedirectResponse
+    {
+        $data = $request->validated();
+        $breed->update([
+            'category_id' => $data['category_id'],
+            'name' => $data['name'],
+            'is_active' => $request->boolean('is_active'),
+            'sale_modes' => $data['sale_modes'],
+            'purposes' => $data['purposes'] ?? [],
+            'dynamic_fields' => $data['dynamic_fields'] ?? [],
+        ]);
+        AuditLog::create(['admin_id' => $request->user()->id, 'action' => 'master_data_updated', 'subject_type' => Breed::class, 'subject_id' => $breed->id, 'description' => 'Jenis ternak diperbarui.']);
+
+        return back()->with('status', 'Jenis ternak berhasil diperbarui.');
+    }
+
+    public function disableBreed(Breed $breed): RedirectResponse
+    {
+        $breed->update(['is_active' => false]);
+        AuditLog::create(['admin_id' => request()->user()->id, 'action' => 'master_data_disabled', 'subject_type' => Breed::class, 'subject_id' => $breed->id, 'description' => 'Jenis ternak dinonaktifkan.']);
+
+        return back()->with('status', 'Jenis ternak dinonaktifkan dan tetap tersimpan pada riwayat transaksi.');
     }
 }

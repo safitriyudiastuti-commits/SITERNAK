@@ -16,7 +16,7 @@ class ContestVerificationController extends Controller
 {
     public function index(Request $request): View
     {
-        $contests = ContestRecord::with('livestock.store')
+        $contests = ContestRecord::with('livestock.store', 'category')
             ->when($request->filled('status'), fn ($query) => $query->where('status', $request->string('status')))
             ->latest()->paginate(15)->withQueryString();
 
