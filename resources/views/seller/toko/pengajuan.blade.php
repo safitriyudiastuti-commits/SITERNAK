@@ -1,76 +1,127 @@
-@extends('layouts.seller')
-@section('title', 'Buka Toko')
+@extends('layouts.buyer')
+@section('title', 'Buka Toko Saya')
 @section('content')
-<h1 class="text-2xl font-bold mb-4">Buka Toko</h1>
+@php
+    use App\Enums\StoreStatus;
 
-@if ($pengajuan && $pengajuan->status === 'pending_verification')
-    <div class="rounded border border-yellow-300 bg-yellow-50 p-4">
-        <p class="font-semibold">Pengajuan Anda sedang diverifikasi admin.</p>
-        <p class="text-sm mt-1">Toko: {{ $pengajuan->nama_toko }} · dikirim {{ $pengajuan->created_at->translatedFormat('d F Y H:i') }}.
-           Estimasi maksimal 2x24 jam kerja. Selama menunggu, Anda tetap dapat berbelanja.</p>
-    </div>
-@else
-    @if ($pengajuan && $pengajuan->status === 'rejected')
-        <div class="mb-4 rounded border border-red-300 bg-red-50 p-4 text-sm">
-            <p class="font-semibold text-red-700">Pengajuan sebelumnya ditolak.</p>
-            <p>Alasan: {{ $pengajuan->catatan_admin ?? '-' }}</p>
-            <p class="mt-1">Silakan perbaiki data dan ajukan kembali.</p>
-        </div>
-    @endif
+    $kategori = ['unggas' => 'Unggas', 'ternak_kecil' => 'Ternak kecil', 'ternak_besar' => 'Ternak besar', 'hasil_ternak' => 'Hasil ternak'];
+    $provinsi = ['Aceh', 'Sumatera Utara', 'Sumatera Barat', 'Riau', 'Kepulauan Riau', 'Jambi', 'Sumatera Selatan',
+        'Kepulauan Bangka Belitung', 'Bengkulu', 'Lampung', 'DKI Jakarta', 'Jawa Barat', 'Banten', 'Jawa Tengah',
+        'DI Yogyakarta', 'Jawa Timur', 'Bali', 'Nusa Tenggara Barat', 'Nusa Tenggara Timur', 'Kalimantan Barat',
+        'Kalimantan Tengah', 'Kalimantan Selatan', 'Kalimantan Timur', 'Kalimantan Utara', 'Sulawesi Utara',
+        'Gorontalo', 'Sulawesi Tengah', 'Sulawesi Barat', 'Sulawesi Selatan', 'Sulawesi Tenggara', 'Maluku',
+        'Maluku Utara', 'Papua', 'Papua Barat', 'Papua Selatan', 'Papua Tengah', 'Papua Pegunungan', 'Papua Barat Daya'];
+    $menunggu = $store && $store->status === StoreStatus::PendingVerification;
+    $ditolak  = $store && $store->status === StoreStatus::Rejected;
+@endphp
 
-    <form method="POST" action="{{ route('seller.toko.pengajuan.store') }}" enctype="multipart/form-data" class="bg-white rounded shadow p-6 space-y-4">
-        @csrf
-        <div class="grid md:grid-cols-2 gap-4">
-            <label class="block text-sm">Nama toko
-                <input name="nama_toko" value="{{ old('nama_toko') }}" class="mt-1 w-full border rounded px-3 py-2" required></label>
-            <label class="block text-sm">Nama pemilik (sesuai KTP)
-                <input name="nama_pemilik" value="{{ old('nama_pemilik', auth()->user()->name) }}" class="mt-1 w-full border rounded px-3 py-2" required></label>
-        </div>
+<p class="text-xs text-gray-500 mb-2">Profil › Toko Saya › <b class="text-gray-800">Buka Toko</b></p>
+<h1 class="text-2xl font-bold text-gray-900">Buka Toko Saya</h1>
+<p class="text-sm text-gray-500 mb-6">Lengkapi data usaha untuk mulai berjualan. Diverifikasi tim SITERNAK maks. 2×24 jam kerja.</p>
 
-        <fieldset>
-            <legend class="text-sm font-medium">Kategori usaha (pilih satu atau lebih)</legend>
-            <div class="flex flex-wrap gap-4 mt-1 text-sm">
-                @foreach (['unggas' => 'Unggas', 'ternak_kecil' => 'Ternak Kecil', 'ternak_besar' => 'Ternak Besar', 'hasil_ternak' => 'Hasil Ternak'] as $v => $l)
-                    <label class="flex items-center gap-1">
-                        <input type="checkbox" name="kategori_usaha[]" value="{{ $v }}" @checked(in_array($v, old('kategori_usaha', [])))> {{ $l }}
-                    </label>
-                @endforeach
+<div class="grid lg:grid-cols-3 gap-6 items-start">
+    <div class="lg:col-span-2">
+
+        @if ($menunggu)
+            <div class="rounded-xl border border-yellow-300 bg-yellow-50 p-5">
+                <p class="font-semibold">Pengajuan Anda sedang diverifikasi.</p>
+                <p class="text-sm mt-1">Toko <b>{{ $store->name }}</b> · dikirim {{ $store->submitted_label }}.
+                   Selama menunggu, Anda tetap dapat berbelanja.</p>
             </div>
-        </fieldset>
+        @else
+            @if ($ditolak)
+                <div class="mb-4 rounded-xl border border-red-300 bg-red-50 p-4 text-sm">
+                    <p class="font-semibold text-red-700">Pengajuan sebelumnya ditolak.</p>
+                    <p>Alasan: {{ $store->rejection_reason ?? '-' }}</p>
+                    <p class="mt-1">Silakan perbaiki data lalu ajukan kembali.</p>
+                </div>
+            @endif
 
-        <div class="grid md:grid-cols-3 gap-4">
-            <label class="block text-sm">Kecamatan
-                <input name="kecamatan" value="{{ old('kecamatan') }}" class="mt-1 w-full border rounded px-3 py-2"></label>
-            <label class="block text-sm">Kota/Kabupaten
-                <input name="kota_kabupaten" value="{{ old('kota_kabupaten') }}" class="mt-1 w-full border rounded px-3 py-2" required></label>
-            <label class="block text-sm">Provinsi
-                <input name="provinsi" value="{{ old('provinsi') }}" class="mt-1 w-full border rounded px-3 py-2" required></label>
+            <form method="POST" action="{{ route('seller.toko.pengajuan.store') }}" enctype="multipart/form-data"
+                  class="bg-white rounded-xl border border-gray-200 p-6 space-y-5">
+                @csrf
+                <h2 class="font-semibold text-gray-900">Data usaha</h2>
+
+                <label class="block text-sm font-medium">Nama toko <span class="text-red-600">*</span>
+                    <input name="name" value="{{ old('name') }}" placeholder="Peternakan Sumber Rejeki"
+                           class="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 font-normal focus:outline-none focus:ring-2 focus:ring-[#2d5a27]" required>
+                </label>
+
+                <fieldset>
+                    <legend class="text-sm font-medium">Kategori usaha <span class="text-red-600">*</span></legend>
+                    <div class="flex flex-wrap gap-2 mt-2">
+                        @foreach ($kategori as $v => $l)
+                            <label class="cursor-pointer">
+                                <input type="checkbox" name="categories[]" value="{{ $v }}" class="peer sr-only"
+                                       @checked(in_array($v, old('categories', [])))>
+                                <span class="inline-block px-4 py-1.5 rounded-full border border-gray-300 text-sm text-gray-600
+                                             peer-checked:bg-[#2d5a27] peer-checked:text-white peer-checked:border-[#2d5a27]">{{ $l }}</span>
+                            </label>
+                        @endforeach
+                    </div>
+                </fieldset>
+
+                <div class="grid md:grid-cols-2 gap-4">
+                    <label class="block text-sm font-medium">Kota/Kabupaten <span class="text-red-600">*</span>
+                        <input name="city" value="{{ old('city') }}" placeholder="Banyuwangi"
+                               class="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 font-normal focus:outline-none focus:ring-2 focus:ring-[#2d5a27]" required>
+                    </label>
+                    <label class="block text-sm font-medium">Provinsi <span class="text-red-600">*</span>
+                        <select name="province" class="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 font-normal bg-white focus:outline-none focus:ring-2 focus:ring-[#2d5a27]" required>
+                            <option value="">Pilih provinsi</option>
+                            @foreach ($provinsi as $p)
+                                <option value="{{ $p }}" @selected(old('province') === $p)>{{ $p }}</option>
+                            @endforeach
+                        </select>
+                    </label>
+                </div>
+
+                <label class="block text-sm font-medium">Alamat usaha <span class="text-red-600">*</span>
+                    <textarea name="address" rows="2" placeholder="Dusun, desa, kecamatan"
+                              class="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 font-normal focus:outline-none focus:ring-2 focus:ring-[#2d5a27]" required>{{ old('address') }}</textarea>
+                </label>
+
+                <div>
+                    <p class="text-sm font-medium">Dokumen verifikasi</p>
+                    <p class="text-xs text-gray-500 mb-2">Jelas dan terbaca. JPG/PNG (buku rekening boleh PDF), maks. 5 MB per berkas.</p>
+                    <div class="grid grid-cols-3 gap-3">
+                        @foreach ([['foto_ktp', 'Foto KTP', 'image/*'], ['foto_lokasi', 'Foto lokasi usaha', 'image/*'], ['buku_rekening', 'Buku rekening', 'image/*,application/pdf']] as [$nama, $label, $accept])
+                            <label class="flex flex-col items-center justify-center gap-1 h-28 px-2 text-center text-xs text-gray-500
+                                          border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:bg-[#eef3ea] hover:border-[#2d5a27]">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 16V4m0 0l-4 4m4-4l4 4M4 20h16"/></svg>
+                                <span class="break-all">{{ $label }}</span>
+                                <input type="file" name="{{ $nama }}" accept="{{ $accept }}" class="sr-only" required
+                                       data-label="{{ $label }}"
+                                       onchange="this.previousElementSibling.textContent = this.files[0] ? this.files[0].name : this.dataset.label">
+                            </label>
+                        @endforeach
+                    </div>
+                </div>
+
+                <label class="flex items-start gap-2 text-sm">
+                    <input type="checkbox" name="pernyataan" value="1" class="mt-1 accent-[#2d5a27]" @checked(old('pernyataan'))>
+                    Saya menyatakan data di atas benar dan bersedia identitas dicek oleh admin.
+                </label>
+
+                <button class="bg-[#2d5a27] hover:bg-[#234a1f] text-white text-sm font-medium px-5 py-2 rounded-lg">Ajukan Verifikasi</button>
+            </form>
+        @endif
+    </div>
+
+    <aside class="bg-white rounded-xl border border-gray-200 p-5 space-y-4 text-sm">
+        <h2 class="font-semibold text-gray-900">Yang perlu diketahui</h2>
+        <div>
+            <p class="font-medium">Diverifikasi manual</p>
+            <p class="text-xs text-gray-500">Tim SITERNAK memeriksa dokumen Anda sebelum toko diaktifkan.</p>
         </div>
-        <label class="block text-sm">Alamat usaha
-            <textarea name="alamat" rows="2" class="mt-1 w-full border rounded px-3 py-2" required>{{ old('alamat') }}</textarea></label>
-
-        <div class="grid md:grid-cols-3 gap-4 text-sm">
-            <label>Foto KTP <input type="file" name="foto_ktp" accept="image/*" class="mt-1 block w-full" required></label>
-            <label>Foto lokasi usaha <input type="file" name="foto_lokasi" accept="image/*" class="mt-1 block w-full" required></label>
-            <label>Buku rekening (JPG/PNG/PDF) <input type="file" name="buku_rekening" accept="image/*,application/pdf" class="mt-1 block w-full" required></label>
+        <div>
+            <p class="font-medium">Maksimal 2×24 jam kerja</p>
+            <p class="text-xs text-gray-500">Hasilnya ditampilkan di halaman ini, termasuk alasan jika ditolak.</p>
         </div>
-        <p class="text-xs text-gray-500">Maksimal 5 MB per berkas. Dokumen disimpan privat dan hanya dilihat admin verifikator.</p>
-
-        <div class="grid md:grid-cols-3 gap-4">
-            <label class="block text-sm">Bank
-                <input name="bank_nama" value="{{ old('bank_nama') }}" class="mt-1 w-full border rounded px-3 py-2" required></label>
-            <label class="block text-sm">No. rekening
-                <input name="bank_no_rekening" value="{{ old('bank_no_rekening') }}" inputmode="numeric" class="mt-1 w-full border rounded px-3 py-2" required></label>
-            <label class="block text-sm">Atas nama
-                <input name="bank_atas_nama" value="{{ old('bank_atas_nama') }}" class="mt-1 w-full border rounded px-3 py-2" required></label>
+        <div>
+            <p class="font-medium">Tetap bisa belanja</p>
+            <p class="text-xs text-gray-500">Hak berjualan aktif setelah disetujui; berbelanja tidak terganggu.</p>
         </div>
-
-        <label class="flex items-start gap-2 text-sm">
-            <input type="checkbox" name="pernyataan" value="1" class="mt-1" @checked(old('pernyataan'))>
-            Saya menyatakan bahwa seluruh data yang saya isi adalah benar.
-        </label>
-
-        <button class="bg-green-700 text-white px-5 py-2 rounded">Kirim Pengajuan</button>
-    </form>
-@endif
+    </aside>
+</div>
 @endsection
