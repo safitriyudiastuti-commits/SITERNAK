@@ -28,7 +28,12 @@ return [
     |
     */
 
-    'disks' => [
+    'disks' => ['private' => [
+    'driver' => 'local',
+    'root' => storage_path('app/private'),
+    'visibility' => 'private',
+    'throw' => false,
+],
 
         'local' => [
             'driver' => 'local',
