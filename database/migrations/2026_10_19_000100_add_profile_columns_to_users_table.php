@@ -9,27 +9,17 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('users', function (Blueprint $table) {
-            // Tiap kolom dicek dulu, supaya aman kalau Safitri sudah menambahkannya.
-            if (! Schema::hasColumn('users', 'role')) {
-                $table->string('role', 20)->default('pembeli')->index();
-            }
-            if (! Schema::hasColumn('users', 'phone')) {
-                $table->string('phone', 20)->nullable()->unique();
-            }
-            if (! Schema::hasColumn('users', 'address')) {
-                $table->text('address')->nullable();
-            }
-            if (! Schema::hasColumn('users', 'city')) {
-                $table->string('city', 100)->nullable();
-            }
-            if (! Schema::hasColumn('users', 'province')) {
-                $table->string('province', 100)->nullable();
-            }
+            $table->string('no_hp', 20)->nullable()->unique();
+            $table->string('alamat')->nullable();
+            $table->string('kota_kabupaten', 100)->nullable();
+            $table->string('provinsi', 100)->nullable();
         });
     }
 
     public function down(): void
     {
-        // Dikosongkan: kolom ini dipakai fitur lain.
+        Schema::table('users', function (Blueprint $table) {
+            $table->dropColumn(['no_hp', 'alamat', 'kota_kabupaten', 'provinsi']);
+        });
     }
 };
