@@ -2,14 +2,11 @@
 
 namespace App\Http\Requests\Auth;
 
-use Illuminate\Auth\Events\Lockout;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\RateLimiter;
-use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
-/** Login memakai email ATAU no HP + kata sandi, dengan pembatasan percobaan. */
 class LoginRequest extends FormRequest
 {
     public function authorize(): bool
@@ -17,64 +14,54 @@ class LoginRequest extends FormRequest
         return true;
     }
 
-    protected function prepareForValidation(): void
-    {
-        $login = trim((string) $this->input('login'));
-
-        if ($login !== '' && ! filter_var($login, FILTER_VALIDATE_EMAIL)) {
-            $login = RegisterRequest::normalisasiHp($login);
-        }
-
-        $this->merge(['login' => $login]);
-    }
-
     public function rules(): array
     {
         return [
-            'login'    => ['required', 'string', 'max:255'],
+            'login' => ['required', 'string'],
             'password' => ['required', 'string'],
         ];
     }
 
-    public function attributes(): array
+    public function messages(): array
     {
-        return ['login' => 'email/no HP', 'password' => 'kata sandi'];
+        return [
+            'login.required' => 'Email atau nomor HP wajib diisi.',
+            'password.required' => 'Kata sandi wajib diisi.',
+        ];
     }
 
+    /** Mencoba masuk memakai email ATAU nomor HP. Gagal = melempar pesan error. */
     public function authenticate(): void
     {
-        $this->pastikanTidakTerkunci();
+        $login = trim((string) $this->input('login'));
 
-        $kolom = filter_var($this->input('login'), FILTER_VALIDATE_EMAIL) ? 'email' : 'no_hp';
+        // Kalau isiannya berbentuk email, cari di kolom email. Kalau tidak, anggap nomor HP.
+        $isEmail = filter_var($login, FILTER_VALIDATE_EMAIL) !== false;
+        $field = $isEmail ? 'email' : 'phone';
+        $value = $isEmail ? strtolower($login) : RegisterRequest::normalizePhone($login);
 
-        if (! Auth::attempt([$kolom => $this->input('login'), 'password' => $this->input('password')], $this->boolean('remember'))) {
-            RateLimiter::hit($this->throttleKey());
+        // Batasi 5 kali salah per akun per perangkat (mencegah tebak-tebak kata sandi).
+        $key = $field.'|'.$value.'|'.$this->ip();
 
+        if (RateLimiter::tooManyAttempts($key, 5)) {
             throw ValidationException::withMessages([
-                'login' => 'Email/no HP atau kata sandi salah.',
+                'login' => 'Terlalu banyak percobaan masuk. Coba lagi dalam '.RateLimiter::availableIn($key).' detik.',
             ]);
         }
 
-        RateLimiter::clear($this->throttleKey());
-    }
+        $berhasil = Auth::attempt(
+            [$field => $value, 'password' => (string) $this->input('password')],
+            $this->boolean('remember')
+        );
 
-    private function pastikanTidakTerkunci(): void
-    {
-        if (! RateLimiter::tooManyAttempts($this->throttleKey(), 5)) {
-            return;
+        if (! $berhasil) {
+            RateLimiter::hit($key);
+
+            throw ValidationException::withMessages([
+                'login' => 'Email/nomor HP atau kata sandi salah.',
+            ]);
         }
 
-        event(new Lockout($this));
-
-        $detik = RateLimiter::availableIn($this->throttleKey());
-
-        throw ValidationException::withMessages([
-            'login' => "Terlalu banyak percobaan. Coba lagi dalam {$detik} detik.",
-        ]);
-    }
-
-    private function throttleKey(): string
-    {
-        return Str::transliterate(Str::lower($this->input('login')) . '|' . $this->ip());
+        RateLimiter::clear($key);
     }
 }

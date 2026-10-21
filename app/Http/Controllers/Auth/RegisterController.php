@@ -7,7 +7,6 @@ use App\Http\Requests\Auth\RegisterRequest;
 use App\Models\User;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 
 /**
@@ -39,10 +38,8 @@ class RegisterController extends Controller
 
         event(new Registered($user));
 
-        Auth::login($user);
-        $request->session()->regenerate();
-
-        return redirect()->route('buyer.katalog.index')
-            ->with('success', 'Akun berhasil dibuat. Selamat datang di SITERNAK!');
+        // Tidak langsung login: pengguna diarahkan ke halaman masuk untuk login sendiri.
+        return redirect()->route('login')
+            ->with('success', 'Akun berhasil dibuat. Silakan masuk dengan email atau no HP dan kata sandi Anda.');
     }
 }
