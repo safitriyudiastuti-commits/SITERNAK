@@ -31,12 +31,14 @@ class LoginController extends Controller
         $request->session()->invalidate();
         $request->session()->regenerateToken();
 
-        return redirect()->route('buyer.katalog.index');
+        return redirect()->route(
+            Route::has('buyer.katalog.index') ? 'buyer.katalog.index' : 'home'
+        );
     }
 
     /**
      * Tujuan setelah login per role. Nama route admin/peternak disesuaikan
-     * dengan milik tim; kalau belum ada, jatuh ke katalog.
+     * dengan milik tim; kalau belum ada, jatuh ke katalog, lalu ke home.
      */
     private function halamanAwal($user): string
     {
@@ -46,6 +48,10 @@ class LoginController extends Controller
             default    => 'buyer.katalog.index',
         };
 
-        return Route::has($rute) ? route($rute) : route('buyer.katalog.index');
+        if (Route::has($rute)) {
+            return route($rute);
+        }
+
+        return route(Route::has('buyer.katalog.index') ? 'buyer.katalog.index' : 'home');
     }
 }
