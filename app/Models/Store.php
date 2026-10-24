@@ -29,6 +29,12 @@ class Store extends Model
         'terms_accepted_at' => 'datetime',
         'submitted_at' => 'datetime',
         'verified_at' => 'datetime',
+        // Profil toko dan mode libur
+        'business_hours' => 'array',
+        'vacation_mode' => 'boolean',
+        'vacation_start' => 'date',
+        'vacation_end' => 'date',
+        'vacation_hide_listings' => 'boolean',
     ];
 
     /* ---------- Relasi ---------- */
