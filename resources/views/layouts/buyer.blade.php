@@ -14,10 +14,13 @@
     // Ubah '#' menjadi route sungguhan saat halaman pembeli tersedia
     $menu = [
         'BELANJA' => [
-            ['Belanjaku', '#', false],
-            ['Katalog Ternak', '#', false],
+            ['Beranda', '#', false],
+            ['Katalog Ternak',
+                route('buyer.katalog.index'),
+                request()->routeIs('buyer.katalog.*')],
             ['Pesanan Saya', '#', false],
         ],
+
         'AKUN' => [
             ['Profil Saya', '#', false],
             ['Toko Saya', route($tokoAktif ? 'seller.toko.profil' : 'seller.toko.pengajuan'), request()->routeIs('seller.toko.pengajuan')],
