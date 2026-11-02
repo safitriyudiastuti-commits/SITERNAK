@@ -32,7 +32,7 @@ Route::middleware(['auth', 'role:admin'])->prefix('admin')->name('admin.')->grou
 | fitur login Teman 1 digabung ke main.
 */
 if (app()->environment('local')) {
-    Route::get('/dev/login-admin', function () {
+    Route::get('/dev/login-admi', function () {
         $admin = \App\Models\User::where('email', 'admin@siternak.test')->firstOrFail();
         auth()->login($admin);
 
