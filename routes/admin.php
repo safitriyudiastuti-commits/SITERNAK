@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Admin\StoreVerificationController;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\Admin\PaymentVerificationController;
 
 /*
 |--------------------------------------------------------------------------
@@ -22,6 +23,14 @@ Route::middleware(['auth', 'role:admin'])->prefix('admin')->name('admin.')->grou
         Route::post('/{store}/keputusan', [StoreVerificationController::class, 'verify'])->name('verify');
         Route::get('/{store}/dokumen/{document}', [StoreVerificationController::class, 'document'])->name('dokumen');
     });
+
+    // UC-19 Verifikasi pembayaran transfer
+    Route::prefix('verifikasi-pembayaran')->name('verifikasi-pembayaran.')->group(function () {
+        Route::get('/', [PaymentVerificationController::class, 'index'])->name('index');
+        Route::get('/{payment}', [PaymentVerificationController::class, 'show'])->name('show');
+        Route::post('/{payment}/keputusan', [PaymentVerificationController::class, 'verify'])->name('verify');
+        Route::get('/{payment}/bukti', [PaymentVerificationController::class, 'bukti'])->name('bukti');
+    });
 });
 
 /*
@@ -32,7 +41,7 @@ Route::middleware(['auth', 'role:admin'])->prefix('admin')->name('admin.')->grou
 | fitur login Teman 1 digabung ke main.
 */
 if (app()->environment('local')) {
-    Route::get('/dev/login-admi', function () {
+    Route::get('/dev/login-admin', function () {
         $admin = \App\Models\User::where('email', 'admin@siternak.test')->firstOrFail();
         auth()->login($admin);
 
