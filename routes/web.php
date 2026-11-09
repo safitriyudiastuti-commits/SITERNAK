@@ -22,3 +22,5 @@ Route::middleware('auth')
     ->group(function () {
         Route::get('/', [KatalogController::class, 'index'])->name('index');
     });
+    
+       require __DIR__ . '/beranda.php';
