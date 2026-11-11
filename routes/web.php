@@ -5,7 +5,9 @@ use App\Http\Controllers\Buyer\KatalogController;
 
 // Halaman depan. Diberi nama "home" supaya bisa dipanggil dengan route('home').
 Route::get('/', function () {
-    return view('welcome');
+    return auth()->check()
+        ? redirect()->route('buyer.katalog.index')
+        : redirect()->route('login');
 })->name('home');
 
 // Memuat route registrasi, login, dan logout dari file auth.php
