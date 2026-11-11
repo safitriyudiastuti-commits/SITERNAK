@@ -8,8 +8,12 @@
 </head>
 <body class="bg-gray-50 text-gray-800">
 <nav class="bg-green-700 text-white">
-    <div class="max-w-6xl mx-auto px-4 py-3 text-sm">
+    <div class="max-w-6xl mx-auto px-4 py-3 text-sm flex items-center justify-between gap-4">
         <span class="font-bold">SITERNAK Seller</span>
+        <div class="flex items-center gap-4">
+            <a href="{{ route('seller.toko.profil') }}" class="hover:underline">Profil toko</a>
+            <a href="{{ route('seller.toko.libur') }}" class="hover:underline">Mode libur</a>
+        </div>
     </div>
 </nav>
 <main class="max-w-6xl mx-auto px-4 py-6">
