@@ -91,7 +91,7 @@
             'title' => 'TOKO SAYA',
             'items' => [
                 ['label' => 'Dashboard Toko', 'href' => route('seller.dasbor'), 'route' => 'seller.dashboard', 'icon' => 'M3 10.5 12 3l9 7.5M5 9v11h14V9M9 20v-6h6v6'],
-                ['label' => 'Ternak Hidup', 'href' => '#', 'icon' => 'M4 7h16M4 12h16M4 17h16M7 4v16'],
+                ['label' => 'Ternak Hidup', 'href' => route('seller.ternak.index'), 'icon' => 'M4 7h16M4 12h16M4 17h16M7 4v16'],
                 ['label' => 'Hasil Ternak', 'href' => '#', 'icon' => 'M12 3v18M5 8c0 3 3 4 7 4s7-1 7-4M5 16c0-3 3-4 7-4s7 1 7 4'],
                 ['label' => 'Pesanan Masuk', 'href' => '#', 'icon' => 'M4 5h16v14H4zM8 9h8M8 13h5'],
                 ['label' => 'Pesanan', 'href' => '#', 'icon' => 'M5 4h14v16H5zM8 8h8M8 12h8M8 16h5'],
