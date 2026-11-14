@@ -89,6 +89,8 @@
                         @foreach ($category->livestock as $item)
                             @php
                                 $displayName = $item->nama_kode ?: $item->commodityType->name;
+                                $hasEligibleContest = $item->mode === 'individual'
+                                    && ! empty($item->commodityType->contest_categories);
                                 $statusClass = $item->status === 'aktif' && $item->stok > 0
                                     ? 'bg-[#e0f3e7] text-[#247341]'
                                     : ($item->status === 'aktif' ? 'bg-[#fff1c9] text-[#a16207]' : 'bg-gray-100 text-gray-600');
@@ -142,7 +144,11 @@
                                     <span class="livestock-pill {{ $statusClass }}">{{ $statusLabel }}</span>
                                 </td>
                                 <td class="px-3 py-3">
-                                    <span class="livestock-pill bg-[#f0f0ec] text-gray-600">Tidak berlaku</span>
+                                    @if ($hasEligibleContest && $item->contestHistories->contains('status', 'verified'))
+                                        <span class="livestock-pill bg-[#e0f3e7] text-[#247341]">Terverifikasi</span>
+                                    @else
+                                        <span class="text-gray-400">—</span>
+                                    @endif
                                 </td>
                                 <td class="px-3 py-3">
                                     <div class="flex justify-end gap-1.5">
