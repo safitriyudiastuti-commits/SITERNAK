@@ -118,7 +118,7 @@
                             @error('commodity_type_id')<span class="mt-1 block text-xs text-red-600">{{ $message }}</span>@enderror
                         </label>
                     </div>
-                    <div id="mode-note" class="rounded-lg bg-[#edf4e9] px-3 py-2.5 text-xs leading-5 text-[#456541]">
+                    <div id="mode-note" class="rounded-lg bg-[#edf4e9] px-3 py-2.5 text-xs leading-5 text-[#456541] {{ $selectedType ? '' : 'hidden' }}">
                         <div class="flex items-center gap-2">
                             <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" class="mr-2 h-4 w-4 shrink-0">
                                 <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.7"/>
@@ -129,13 +129,11 @@
                                     Mode pencatatan: Individual. Satu data mewakili satu ekor ternak.
                                 @elseif ($initialMode === 'batch')
                                     Mode pencatatan: Batch. Masukkan jumlah ternak dalam kelompok ini.
-                                @else
-                                    Pilih jenis ternak untuk melihat mode pencatatan yang tersedia.
                                 @endif
                             </span>
                         </div>
                         <input type="hidden" name="mode" id="mode" value="{{ $initialMode }}">
-                        <div id="mode-options" class="mt-2 flex flex-wrap gap-1.5 {{ count($initialModes) > 1 ? '' : 'hidden' }}">
+                        <div id="mode-options" class="mt-2 flex flex-wrap gap-1.5 {{ count($initialModes) === 2 ? '' : 'hidden' }}">
                             @foreach ($initialModes as $mode)
                                 <button type="button" data-mode-option="{{ $mode }}"
                                         class="livestock-mode-option rounded-full border border-[#cbd8c5] bg-white px-3 py-1 text-[10px] font-medium text-[#456541] hover:border-[#2d5a27] {{ $initialMode === $mode ? 'is-selected' : '' }}"
@@ -144,8 +142,8 @@
                                 </button>
                             @endforeach
                         </div>
-                        @error('mode')<span class="mt-1 block text-xs text-red-600">{{ $message }}</span>@enderror
                     </div>
+                    @error('mode')<span id="mode-error" class="block text-xs text-red-600">{{ $message }}</span>@enderror
                 </section>
 
                 <section class="livestock-form-card space-y-4">
@@ -189,7 +187,7 @@
                         <label data-form-field="umur_bulan" class="livestock-form-label {{ array_key_exists('umur_bulan', $fieldConfig) ? '' : 'hidden' }}">
                             Umur <span class="dynamic-required text-red-600">{{ ! empty($fieldConfig['umur_bulan']) ? '*' : '' }}</span>
                             <span class="relative block">
-                                <input type="number" name="umur" id="umur" min="0" max="1200" step="1"
+                                <input type="number" name="umur" id="umur_bulan" min="0" max="1200" step="1"
                                        value="{{ old('umur', $livestock?->umur) }}" @required(! empty($fieldConfig['umur_bulan']))
                                        class="livestock-form-control pr-14">
                                 <span class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-normal text-gray-400">bulan</span>
@@ -199,7 +197,7 @@
                         <label data-form-field="berat_kg" class="livestock-form-label {{ array_key_exists('berat_kg', $fieldConfig) ? '' : 'hidden' }}">
                             Berat <span class="dynamic-required text-red-600">{{ ! empty($fieldConfig['berat_kg']) ? '*' : '' }}</span>
                             <span class="relative block">
-                                <input type="number" name="berat" id="berat" min="0" max="1000000" step="0.01"
+                                <input type="number" name="berat" id="berat_kg" min="0" max="1000000" step="0.01"
                                        value="{{ old('berat', $livestock?->berat) }}" @required(! empty($fieldConfig['berat_kg']))
                                        class="livestock-form-control pr-10">
                                 <span class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-normal text-gray-400">kg</span>
@@ -232,7 +230,7 @@
 
                     <div id="purpose-field" class="{{ $initialPurposes ? '' : 'hidden' }}">
                         <p class="mb-2 text-xs font-semibold text-gray-700">
-                            Peruntukan @if ($initialPurposes)<span class="text-red-600">*</span>@endif
+                            Peruntukan <span id="purpose-required-marker" class="text-red-600 {{ $initialPurposes ? '' : 'hidden' }}">*</span>
                         </p>
                         <div id="purpose-options" class="flex flex-wrap gap-1.5">
                             @foreach ($initialPurposes as $purpose)
@@ -329,6 +327,43 @@
                     @error('media.*')<span class="block text-xs text-red-600">{{ $message }}</span>@enderror
                 </section>
 
+                <section id="pedigree-card" class="livestock-form-card space-y-4 {{ $initialMode === 'individual' ? '' : 'hidden' }}">
+                    <div class="flex items-center justify-between gap-3">
+                        <div class="flex items-center gap-2">
+                            <span class="flex h-6 w-6 items-center justify-center rounded-full bg-[#eef3ea] text-xs font-bold text-[#2d5a27]">4</span>
+                            <h2 class="text-sm font-bold text-gray-900">Silsilah</h2>
+                        </div>
+                        <span class="rounded-full bg-[#f0f0ec] px-2.5 py-1 text-[10px] font-medium text-gray-600">Opsional</span>
+                    </div>
+                    <div class="grid gap-3 sm:grid-cols-2">
+                        <label class="livestock-form-label">
+                            Nama induk betina
+                            <input type="text" name="nama_induk_betina" value="{{ old('nama_induk_betina', $livestock?->nama_induk_betina) }}"
+                                   maxlength="100" data-pedigree-field class="livestock-form-control">
+                            @error('nama_induk_betina')<span class="mt-1 block text-xs text-red-600">{{ $message }}</span>@enderror
+                        </label>
+                        <label class="livestock-form-label">
+                            Ras induk betina
+                            <input type="text" name="ras_induk_betina" value="{{ old('ras_induk_betina', $livestock?->ras_induk_betina) }}"
+                                   maxlength="100" data-pedigree-field class="livestock-form-control">
+                            @error('ras_induk_betina')<span class="mt-1 block text-xs text-red-600">{{ $message }}</span>@enderror
+                        </label>
+                        <label class="livestock-form-label">
+                            Nama pejantan
+                            <input type="text" name="nama_pejantan" value="{{ old('nama_pejantan', $livestock?->nama_pejantan) }}"
+                                   maxlength="100" data-pedigree-field class="livestock-form-control">
+                            @error('nama_pejantan')<span class="mt-1 block text-xs text-red-600">{{ $message }}</span>@enderror
+                        </label>
+                        <label class="livestock-form-label">
+                            Ras pejantan
+                            <input type="text" name="ras_pejantan" value="{{ old('ras_pejantan', $livestock?->ras_pejantan) }}"
+                                   maxlength="100" data-pedigree-field class="livestock-form-control">
+                            @error('ras_pejantan')<span class="mt-1 block text-xs text-red-600">{{ $message }}</span>@enderror
+                        </label>
+                    </div>
+                    <p class="text-[10px] text-gray-500">Jika diisi, semua kolom silsilah wajib lengkap.</p>
+                </section>
+
                 <div class="flex flex-col-reverse justify-end gap-2 sm:flex-row">
                     <a href="{{ route('seller.ternak.index') }}"
                        class="rounded-lg border border-gray-200 bg-white px-5 py-2.5 text-center text-sm font-medium text-gray-700 hover:bg-gray-50">
@@ -400,8 +435,11 @@
         const categorySelect = document.getElementById('category_id');
         const typeSelect = document.getElementById('commodity_type_id');
         const modeSelect = document.getElementById('mode');
+        const modeNote = document.getElementById('mode-note');
         const stockInput = document.getElementById('stok');
         const quantityInput = document.getElementById('jumlah');
+        const pedigreeCard = document.getElementById('pedigree-card');
+        const pedigreeFields = [...document.querySelectorAll('[data-pedigree-field]')];
         const types = @json($types);
         const modeLabels = @json($modeLabels);
         const purposeLabels = @json($purposeLabels);
@@ -412,16 +450,9 @@
             nama_kode: 'nama_kode',
             ras: 'ras',
             jenis_kelamin: 'jenis_kelamin',
-            umur_bulan: 'umur_bulan',
-            berat_kg: 'berat_kg',
+            umur_bulan: 'umur',
+            berat_kg: 'berat',
         };
-
-        function setOptions(select, options, labels, selected, placeholder) {
-            select.replaceChildren(new Option(placeholder, ''));
-            options.forEach((value) => {
-                select.add(new Option(labels[value] ?? value, value, false, value === selected));
-            });
-        }
 
         function updatePreview() {
             const type = types.find((item) => String(item.id) === typeSelect.value);
@@ -447,6 +478,7 @@
             const options = document.getElementById('purpose-options');
             const chosen = preserveSelection && purposes.includes(previousPurpose) ? previousPurpose : '';
             field.classList.toggle('hidden', purposes.length === 0);
+            document.getElementById('purpose-required-marker').classList.toggle('hidden', purposes.length === 0);
             options.replaceChildren();
             purposes.forEach((value) => {
                 const label = document.createElement('label');
@@ -471,23 +503,39 @@
         function updateModeFields() {
             const selectedMode = modeSelect.value;
             const isBatch = selectedMode === 'batch';
+            const type = types.find((item) =>
+                String(item.id) === typeSelect.value && String(item.category_id) === categorySelect.value
+            );
             const field = document.getElementById('jumlah-field');
             const input = document.getElementById('jumlah');
             field.classList.toggle('hidden', !isBatch);
             input.required = isBatch;
             if (!isBatch) input.value = '';
             stockInput.value = isBatch ? input.value : '1';
+            modeNote.classList.toggle('hidden', !type);
+            document.getElementById('mode-error')?.classList.toggle('hidden', Boolean(type));
             document.getElementById('mode-note-text').textContent = selectedMode === 'individual'
                 ? 'Mode pencatatan: Individual. Satu data mewakili satu ekor ternak.'
                 : selectedMode === 'batch'
                     ? 'Mode pencatatan: Batch. Masukkan jumlah ternak dalam kelompok ini.'
-                    : 'Pilih jenis ternak untuk melihat mode pencatatan yang tersedia.';
+                    : '';
             document.querySelectorAll('[data-mode-option]').forEach((button) => {
                 const selected = button.dataset.modeOption === selectedMode;
                 button.classList.toggle('is-selected', selected);
                 button.setAttribute('aria-pressed', selected ? 'true' : 'false');
             });
+            updatePedigreeFields();
             updatePreview();
+        }
+
+        function updatePedigreeFields() {
+            const isIndividual = modeSelect.value === 'individual';
+            const hasPedigreeValue = pedigreeFields.some((field) => field.value.trim() !== '');
+            pedigreeCard.classList.toggle('hidden', !isIndividual);
+            pedigreeFields.forEach((field) => {
+                field.disabled = !isIndividual;
+                field.required = isIndividual && hasPedigreeValue;
+            });
         }
 
         function updateTypeFields(preserveSelection = false) {
@@ -498,10 +546,16 @@
                 const wrapper = document.querySelector(`[data-form-field="${key}"]`);
                 if (!wrapper) return;
                 const input = wrapper.querySelector(`[name="${name}"]`);
+                if (!input) return;
+                const requiredMarker = wrapper.querySelector('.dynamic-required');
+                const available = key in fields;
                 const required = Boolean(fields[key]);
-                wrapper.classList.toggle('hidden', !(key in fields));
-                input.required = required;
-                wrapper.querySelector('.dynamic-required').textContent = required ? '*' : '';
+                wrapper.classList.toggle('hidden', !available);
+                input.disabled = !available;
+                input.required = available && required;
+                if (requiredMarker) {
+                    requiredMarker.textContent = required ? '*' : '';
+                }
             });
 
             const currentMode = modeSelect.value;
@@ -513,7 +567,7 @@
             modeSelect.value = chosenMode;
             const modeOptions = document.getElementById('mode-options');
             modeOptions.replaceChildren();
-            modeOptions.classList.toggle('hidden', (type?.selling_modes.length ?? 0) < 2);
+            modeOptions.classList.toggle('hidden', (type?.selling_modes.length ?? 0) !== 2);
             (type?.selling_modes ?? []).forEach((mode) => {
                 const button = document.createElement('button');
                 button.type = 'button';
@@ -535,6 +589,9 @@
             availableTypes.forEach((item) => {
                 typeSelect.add(new Option(item.name, item.id, false, preserveSelection && String(item.id) === selectedTypeId));
             });
+            typeSelect.value = preserveSelection && availableTypes.some((item) => String(item.id) === selectedTypeId)
+                ? selectedTypeId
+                : '';
             updateTypeFields(preserveSelection);
         }
 
@@ -582,6 +639,9 @@
         });
         quantityInput.addEventListener('input', () => {
             if (modeSelect.value === 'batch') stockInput.value = quantityInput.value;
+        });
+        pedigreeFields.forEach((field) => {
+            field.addEventListener('input', updatePedigreeFields);
         });
         document.getElementById('livestock-form').addEventListener('submit', () => {
             stockInput.value = modeSelect.value === 'batch' ? quantityInput.value : '1';

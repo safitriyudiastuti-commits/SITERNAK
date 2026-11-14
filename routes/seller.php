@@ -17,6 +17,7 @@ Route::middleware('auth')->prefix('seller')->name('seller.')->group(function () 
         Route::get('ternak', [LivestockController::class, 'index'])->name('ternak.index');
         Route::get('ternak/create', [LivestockController::class, 'create'])->name('ternak.create');
         Route::post('ternak', [LivestockController::class, 'store'])->name('ternak.store');
+        Route::get('ternak/{livestock}', [LivestockController::class, 'show'])->name('ternak.show');
         Route::get('ternak/{livestock}/edit', [LivestockController::class, 'edit'])->name('ternak.edit');
         Route::put('ternak/{livestock}', [LivestockController::class, 'update'])->name('ternak.update');
         Route::delete('ternak/{livestock}', [LivestockController::class, 'destroy'])->name('ternak.destroy');

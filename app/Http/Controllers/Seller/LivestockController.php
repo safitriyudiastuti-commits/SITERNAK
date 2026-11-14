@@ -45,6 +45,14 @@ class LivestockController extends Controller
         return view('seller.ternak.index', compact('categories', 'store'));
     }
 
+    public function show(Request $request, int $livestock): View
+    {
+        $store = $this->activeStore($request);
+        $item = $this->ownedLivestock($store, $livestock);
+
+        return view('seller.ternak.show', compact('item', 'store'));
+    }
+
     public function create(Request $request): View
     {
         return view('seller.ternak.form', [

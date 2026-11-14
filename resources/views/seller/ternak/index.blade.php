@@ -109,7 +109,10 @@
                                             </svg>
                                         </span>
                                         <span class="min-w-0">
-                                            <span class="block max-w-56 truncate font-semibold text-gray-900">{{ $displayName }}</span>
+                                            <a href="{{ route('seller.ternak.show', $item->id) }}"
+                                               class="block max-w-56 truncate font-semibold text-gray-900 hover:text-[#2d5a27]">
+                                                {{ $displayName }}
+                                            </a>
                                             <span class="mt-0.5 block truncate text-[10px] text-gray-500">
                                                 {{ $item->commodityType->name }}
                                                 @if ($item->ras && $item->ras !== $item->commodityType->name) · {{ $item->ras }} @endif

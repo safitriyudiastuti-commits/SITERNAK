@@ -6,6 +6,7 @@ use App\Models\CommodityType;
 use App\Models\Livestock;
 use App\Models\Store;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
@@ -15,6 +16,18 @@ class LivestockRequest extends FormRequest
     public function authorize(): bool
     {
         return $this->user() !== null;
+    }
+
+    protected function prepareForValidation(): void
+    {
+        if ($this->input('mode') === 'batch') {
+            $this->merge([
+                'nama_induk_betina' => null,
+                'ras_induk_betina' => null,
+                'nama_pejantan' => null,
+                'ras_pejantan' => null,
+            ]);
+        }
     }
 
     public function rules(): array
@@ -53,6 +66,10 @@ class LivestockRequest extends FormRequest
                 : ['nullable', 'string', Rule::in([])],
             'nama_kode' => $this->dynamicFieldRules($formFields, 'nama_kode', ['string', 'max:100']),
             'ras' => $this->dynamicFieldRules($formFields, 'ras', ['string', 'max:100']),
+            'nama_induk_betina' => ['nullable', 'string', 'max:100', 'required_with:ras_induk_betina,nama_pejantan,ras_pejantan'],
+            'ras_induk_betina' => ['nullable', 'string', 'max:100', 'required_with:nama_induk_betina,nama_pejantan,ras_pejantan'],
+            'nama_pejantan' => ['nullable', 'string', 'max:100', 'required_with:nama_induk_betina,ras_induk_betina,ras_pejantan'],
+            'ras_pejantan' => ['nullable', 'string', 'max:100', 'required_with:nama_induk_betina,ras_induk_betina,nama_pejantan'],
             'jenis_kelamin' => $this->dynamicFieldRules($formFields, 'jenis_kelamin', [
                 'string',
                 Rule::in(['jantan', 'betina', 'campuran']),
@@ -145,6 +162,10 @@ class LivestockRequest extends FormRequest
             'mode.in' => 'Mode penjualan tidak tersedia untuk jenis ternak ini.',
             'purpose.required' => 'Pilih peruntukan ternak.',
             'purpose.in' => 'Peruntukan tidak tersedia untuk jenis ternak ini.',
+            'nama_induk_betina.required_with' => 'Nama induk betina wajib diisi jika silsilah dilengkapi.',
+            'ras_induk_betina.required_with' => 'Ras induk betina wajib diisi jika silsilah dilengkapi.',
+            'nama_pejantan.required_with' => 'Nama pejantan wajib diisi jika silsilah dilengkapi.',
+            'ras_pejantan.required_with' => 'Ras pejantan wajib diisi jika silsilah dilengkapi.',
             'jumlah.required' => 'Masukkan jumlah ternak.',
             'stok.required' => 'Stok ternak wajib diisi.',
             'status.required' => 'Pilih status ketersediaan.',
@@ -165,6 +186,10 @@ class LivestockRequest extends FormRequest
             'purpose' => 'peruntukan',
             'nama_kode' => 'nama atau kode ternak',
             'ras' => 'ras',
+            'nama_induk_betina' => 'nama induk betina',
+            'ras_induk_betina' => 'ras induk betina',
+            'nama_pejantan' => 'nama pejantan',
+            'ras_pejantan' => 'ras pejantan',
             'jenis_kelamin' => 'jenis kelamin',
             'umur' => 'umur',
             'berat' => 'berat',
@@ -200,7 +225,7 @@ class LivestockRequest extends FormRequest
     }
 
     /**
-     * @return array<int, \Illuminate\Http\UploadedFile>
+     * @return array<int, UploadedFile>
      */
     private function uploadedMedia(): array
     {
