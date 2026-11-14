@@ -21,7 +21,16 @@ class LoginController extends Controller
         $request->authenticate();
         $request->session()->regenerate();
 
-        return redirect()->intended($this->halamanAwal($request->user()));
+        $user = $request->user();
+        $tujuan = $this->halamanAwal($user);
+
+        // Admin dan peternak selalu ke dashboard mereka sendiri. Pembeli boleh
+        // kembali ke halaman yang tadi dituju (intended).
+        if (in_array($this->namaRole($user), ['admin', 'peternak'], true)) {
+            return redirect()->to($tujuan);
+        }
+
+        return redirect()->intended($tujuan);
     }
 
     public function logout(Request $request): RedirectResponse
@@ -31,9 +40,9 @@ class LoginController extends Controller
         $request->session()->invalidate();
         $request->session()->regenerateToken();
 
-        return redirect()->route(
-            Route::has('buyer.katalog.index') ? 'buyer.katalog.index' : 'home'
-        );
+        // Ke halaman login (halaman tamu), bukan halaman yang dilindungi auth,
+        // supaya tidak ada "tujuan tercatat" yang membelokkan login berikutnya.
+        return redirect()->route('login');
     }
 
     /**
@@ -42,7 +51,7 @@ class LoginController extends Controller
      */
     private function halamanAwal($user): string
     {
-        $rute = match ($user->role) {
+        $rute = match ($this->namaRole($user)) {
             'admin'    => 'admin.dashboard',
             'peternak' => 'peternak.dashboard',
             default    => 'buyer.katalog.index',
@@ -53,5 +62,13 @@ class LoginController extends Controller
         }
 
         return route(Route::has('buyer.katalog.index') ? 'buyer.katalog.index' : 'home');
+    }
+
+    // Role bisa berupa teks biasa atau enum; ambil nilainya sebagai teks.
+    private function namaRole($user): string
+    {
+        $role = $user->role;
+
+        return (string) ($role instanceof \BackedEnum ? $role->value : $role);
     }
 }

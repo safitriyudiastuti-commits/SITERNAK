@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\StoreStatus;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -11,6 +12,8 @@ use Illuminate\Support\Str;
 
 class Store extends Model
 {
+    use HasFactory;
+
     /** Batas verifikasi 2 x 24 jam (SRS UC-18). */
     public const SLA_HOURS = 48;
 
@@ -29,6 +32,11 @@ class Store extends Model
         'terms_accepted_at' => 'datetime',
         'submitted_at' => 'datetime',
         'verified_at' => 'datetime',
+        'business_hours' => 'array',
+        'vacation_mode' => 'boolean',
+        'vacation_start' => 'date',
+        'vacation_end' => 'date',
+        'vacation_hide_listings' => 'boolean',
     ];
 
     /* ---------- Relasi ---------- */
@@ -46,6 +54,15 @@ class Store extends Model
     public function documents(): HasMany
     {
         return $this->hasMany(StoreDocument::class);
+    }
+
+    public function isOnVacation(): bool
+    {
+        return $this->vacation_mode
+            && $this->vacation_start !== null
+            && $this->vacation_end !== null
+            && $this->vacation_start->lte(today())
+            && $this->vacation_end->gte(today());
     }
 
     /* ---------- Helper tampilan (dipakai view admin) ---------- */

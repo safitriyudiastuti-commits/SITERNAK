@@ -1,7 +1,8 @@
 @props(['nama', 'class' => 'h-5 w-5', 'sw' => 2])
 
 @php
-    // Path ikon disalin dari prototype (kanvas 24x24). Tebal garis (sw) mengikuti pemakaian di prototype.
+    // Path ikon disalin dari prototype (kanvas 24x24).
+    // Tebal garis (sw) mengikuti pemakaian di prototype.
     $ikon = [
         'home'     => '<path d="M3 11 12 3l9 8"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/>',
         'grid'     => '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>',
@@ -33,5 +34,11 @@
     ];
 @endphp
 
-<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="{{ $sw }}" stroke-linecap="round" stroke-linejoin="round"
-     {{ $attributes->merge(['class' => $class]) }} aria-hidden="true">{!! $ikon[$nama] ?? '' !!}</svg>
+<svg viewBox="0 0 24 24"
+     fill="none"
+     stroke="currentColor"
+     stroke-width="{{ $sw }}"
+     stroke-linecap="round"
+     stroke-linejoin="round"
+     {{ $attributes->merge(['class' => $class]) }}
+     aria-hidden="true">{!! $ikon[$nama] ?? '' !!}</svg>

@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Admin\StoreVerificationController;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\Admin\CommodityTypeController;
 
 /*
 |--------------------------------------------------------------------------
@@ -22,6 +23,15 @@ Route::middleware(['auth', 'role:admin'])->prefix('admin')->name('admin.')->grou
         Route::post('/{store}/keputusan', [StoreVerificationController::class, 'verify'])->name('verify');
         Route::get('/{store}/dokumen/{document}', [StoreVerificationController::class, 'document'])->name('dokumen');
     });
+
+        // UC-21 Data induk komoditas
+    Route::prefix('data-induk')->name('data-induk.')->group(function () {
+        Route::get('/', [CommodityTypeController::class, 'index'])->name('index');
+        Route::post('/', [CommodityTypeController::class, 'store'])->name('store');
+        Route::get('/{type}', [CommodityTypeController::class, 'show'])->name('show');
+        Route::put('/{type}', [CommodityTypeController::class, 'update'])->name('update');
+        Route::post('/{type}/status', [CommodityTypeController::class, 'toggle'])->name('toggle');
+    });
 });
 
 /*
@@ -32,7 +42,7 @@ Route::middleware(['auth', 'role:admin'])->prefix('admin')->name('admin.')->grou
 | fitur login Teman 1 digabung ke main.
 */
 if (app()->environment('local')) {
-    Route::get('/dev/login-admin', function () {
+    Route::get('/dev/login-admi', function () {
         $admin = \App\Models\User::where('email', 'admin@siternak.test')->firstOrFail();
         auth()->login($admin);
 
