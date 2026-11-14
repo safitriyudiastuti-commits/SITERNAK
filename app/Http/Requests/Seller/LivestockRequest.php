@@ -36,6 +36,7 @@ class LivestockRequest extends FormRequest
         $formFields = $type?->form_fields ?? [];
         $purposes = $type?->purposes ?? [];
         $modes = $type?->selling_modes ?? [];
+        $contestCategories = $type?->contest_categories ?? [];
 
         return [
             'category_id' => [
@@ -70,6 +71,13 @@ class LivestockRequest extends FormRequest
             'ras_induk_betina' => ['nullable', 'string', 'max:100', 'required_with:nama_induk_betina,nama_pejantan,ras_pejantan'],
             'nama_pejantan' => ['nullable', 'string', 'max:100', 'required_with:nama_induk_betina,ras_induk_betina,ras_pejantan'],
             'ras_pejantan' => ['nullable', 'string', 'max:100', 'required_with:nama_induk_betina,ras_induk_betina,nama_pejantan'],
+            'contest' => ['nullable', 'array'],
+            'contest.contest_name' => ['nullable', 'string', 'max:150'],
+            'contest.category' => ['nullable', 'string', 'max:100', Rule::in($contestCategories)],
+            'contest.rank' => ['nullable', 'string', 'max:100'],
+            'contest.contest_date' => ['nullable', 'date_format:Y-m-d'],
+            'contest.organizer' => ['nullable', 'string', 'max:150'],
+            'contest.certificate' => ['nullable', 'file', 'mimes:jpg,jpeg,png,pdf', 'max:5120'],
             'jenis_kelamin' => $this->dynamicFieldRules($formFields, 'jenis_kelamin', [
                 'string',
                 Rule::in(['jantan', 'betina', 'campuran']),
@@ -97,6 +105,8 @@ class LivestockRequest extends FormRequest
     public function withValidator(Validator $validator): void
     {
         $validator->after(function (Validator $validator): void {
+            $this->validateContestInput($validator);
+
             $user = $this->user();
             if (! $user) {
                 return;
@@ -166,6 +176,14 @@ class LivestockRequest extends FormRequest
             'ras_induk_betina.required_with' => 'Ras induk betina wajib diisi jika silsilah dilengkapi.',
             'nama_pejantan.required_with' => 'Nama pejantan wajib diisi jika silsilah dilengkapi.',
             'ras_pejantan.required_with' => 'Ras pejantan wajib diisi jika silsilah dilengkapi.',
+            'contest.contest_name.max' => 'Nama kontes maksimal 150 karakter.',
+            'contest.category.in' => 'Kategori kontes tidak tersedia untuk jenis ternak ini.',
+            'contest.rank.max' => 'Peringkat maksimal 100 karakter.',
+            'contest.contest_date.date_format' => 'Tanggal kontes harus menggunakan format yang valid.',
+            'contest.organizer.max' => 'Nama penyelenggara maksimal 150 karakter.',
+            'contest.certificate.file' => 'Sertifikat harus berupa berkas yang valid.',
+            'contest.certificate.mimes' => 'Sertifikat harus berupa JPG, PNG, atau PDF.',
+            'contest.certificate.max' => 'Ukuran sertifikat maksimal 5 MB.',
             'jumlah.required' => 'Masukkan jumlah ternak.',
             'stok.required' => 'Stok ternak wajib diisi.',
             'status.required' => 'Pilih status ketersediaan.',
@@ -190,6 +208,12 @@ class LivestockRequest extends FormRequest
             'ras_induk_betina' => 'ras induk betina',
             'nama_pejantan' => 'nama pejantan',
             'ras_pejantan' => 'ras pejantan',
+            'contest.contest_name' => 'nama kontes',
+            'contest.category' => 'kategori kontes',
+            'contest.rank' => 'peringkat kontes',
+            'contest.contest_date' => 'tanggal kontes',
+            'contest.organizer' => 'penyelenggara kontes',
+            'contest.certificate' => 'sertifikat kontes',
             'jenis_kelamin' => 'jenis kelamin',
             'umur' => 'umur',
             'berat' => 'berat',
@@ -207,6 +231,49 @@ class LivestockRequest extends FormRequest
         return ! empty($fields[$key])
             ? array_merge(['required'], $rules)
             : array_merge(['nullable'], $rules);
+    }
+
+    private function validateContestInput(Validator $validator): void
+    {
+        $contestFields = [
+            'contest.contest_name' => 'Nama kontes wajib diisi jika riwayat kontes dilengkapi.',
+            'contest.category' => 'Kategori kontes wajib diisi jika riwayat kontes dilengkapi.',
+            'contest.rank' => 'Peringkat wajib diisi jika riwayat kontes dilengkapi.',
+            'contest.contest_date' => 'Tanggal kontes wajib diisi jika riwayat kontes dilengkapi.',
+            'contest.organizer' => 'Penyelenggara wajib diisi jika riwayat kontes dilengkapi.',
+        ];
+        $hasContestData = $this->hasFile('contest.certificate');
+
+        foreach (array_keys($contestFields) as $field) {
+            $hasContestData = $hasContestData || $this->filled($field);
+        }
+
+        if (! $hasContestData) {
+            return;
+        }
+
+        $type = $this->selectedType();
+        if ($this->input('mode') !== 'individual' || empty($type?->contest_categories)) {
+            $validator->errors()->add(
+                'contest.contest_name',
+                'Riwayat kontes hanya tersedia untuk ternak individual dengan kategori kontes.'
+            );
+
+            return;
+        }
+
+        foreach ($contestFields as $field => $message) {
+            if (! $this->filled($field)) {
+                $validator->errors()->add($field, $message);
+            }
+        }
+
+        if (! $this->hasFile('contest.certificate')) {
+            $validator->errors()->add(
+                'contest.certificate',
+                'Unggah sertifikat jika riwayat kontes dilengkapi.'
+            );
+        }
     }
 
     private function selectedType(): ?CommodityType

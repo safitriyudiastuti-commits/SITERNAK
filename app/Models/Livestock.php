@@ -56,4 +56,9 @@ class Livestock extends Model
     {
         return $this->hasMany(LivestockMedia::class);
     }
+
+    public function contestHistories(): HasMany
+    {
+        return $this->hasMany(LivestockContestHistory::class);
+    }
 }

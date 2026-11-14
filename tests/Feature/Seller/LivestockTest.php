@@ -6,6 +6,7 @@ use App\Enums\StoreStatus;
 use App\Models\CommodityCategory;
 use App\Models\CommodityType;
 use App\Models\Livestock;
+use App\Models\LivestockContestHistory;
 use App\Models\LivestockMedia;
 use App\Models\Store;
 use App\Models\User;
@@ -105,7 +106,11 @@ class LivestockTest extends TestCase
             ->assertSee('name="mode"', false)
             ->assertSee('name="purpose"', false)
             ->assertSee('name="stok"', false)
-            ->assertSee('name="media[]"', false);
+            ->assertSee('name="media[]"', false)
+            ->assertSee('id="contest-card"', false)
+            ->assertSee('name="contest[contest_name]"', false)
+            ->assertSee('name="contest[category]"', false)
+            ->assertSee('name="contest[certificate]"', false);
 
         $this->actingAs($store->owner)
             ->post(route('seller.ternak.store'), $data)
@@ -141,6 +146,94 @@ class LivestockTest extends TestCase
             'stok' => 1,
         ]);
         $this->assertDatabaseCount('livestock_media', 1);
+    }
+
+    public function test_menambah_ternak_dan_riwayat_kontes_dalam_satu_transaksi(): void
+    {
+        Storage::fake('private');
+        Storage::fake('public');
+        $store = $this->activeStore();
+        $this->individualType->update(['contest_categories' => ['Postur', 'Bobot badan']]);
+
+        $this->actingAs($store->owner)
+            ->post(route('seller.ternak.store'), $this->validData([
+                'commodity_type_id' => $this->individualType->id,
+                'mode' => 'individual',
+                'purpose' => 'bibit',
+                'jumlah' => null,
+                'stok' => 1,
+                'contest' => [
+                    'contest_name' => 'Kontes Sapi Jawa Timur 2025',
+                    'category' => 'Postur',
+                    'rank' => 'Juara 2',
+                    'contest_date' => '2025-08-14',
+                    'organizer' => 'Dinas Peternakan Jatim',
+                    'certificate' => UploadedFile::fake()->create('sertifikat.pdf', 200, 'application/pdf'),
+                ],
+            ]))
+            ->assertRedirect(route('seller.ternak.index'))
+            ->assertSessionHas('success', 'Data ternak berhasil ditambahkan.');
+
+        $livestock = Livestock::query()->where('store_id', $store->id)->firstOrFail();
+        $history = LivestockContestHistory::query()->where('livestock_id', $livestock->id)->firstOrFail();
+        $this->assertSame('pending', $history->status);
+        $this->assertDatabaseHas('livestock_contest_histories', [
+            'livestock_id' => $livestock->id,
+            'contest_name' => 'Kontes Sapi Jawa Timur 2025',
+            'category' => 'Postur',
+            'rank' => 'Juara 2',
+            'status' => 'pending',
+        ]);
+        Storage::disk('private')->assertExists($history->certificate_path);
+        Storage::disk('public')->assertMissing($history->certificate_path);
+    }
+
+    public function test_riwayat_kontes_yang_diisi_sebagian_ditolak_dan_old_input_dipertahankan(): void
+    {
+        $store = $this->activeStore();
+        $this->individualType->update(['contest_categories' => ['Postur']]);
+
+        $this->actingAs($store->owner)
+            ->from(route('seller.ternak.create'))
+            ->post(route('seller.ternak.store'), $this->validData([
+                'commodity_type_id' => $this->individualType->id,
+                'mode' => 'individual',
+                'purpose' => 'bibit',
+                'jumlah' => null,
+                'stok' => 1,
+                'contest' => [
+                    'contest_name' => 'Kontes Sapi Jawa Timur 2025',
+                    'category' => '',
+                    'rank' => '',
+                    'contest_date' => '',
+                    'organizer' => '',
+                ],
+            ]))
+            ->assertRedirect(route('seller.ternak.create'))
+            ->assertSessionHasErrors([
+                'contest.category',
+                'contest.rank',
+                'contest.contest_date',
+                'contest.organizer',
+                'contest.certificate',
+            ])
+            ->assertSessionHas('_old_input.contest.contest_name', 'Kontes Sapi Jawa Timur 2025');
+
+        $this->assertDatabaseCount('livestock', 0);
+        $this->assertDatabaseCount('livestock_contest_histories', 0);
+    }
+
+    public function test_mode_batch_tidak_menyimpan_riwayat_kontes(): void
+    {
+        $store = $this->activeStore();
+
+        $this->actingAs($store->owner)
+            ->post(route('seller.ternak.store'), $this->validData())
+            ->assertRedirect(route('seller.ternak.index'))
+            ->assertSessionHas('success');
+
+        $this->assertDatabaseCount('livestock', 1);
+        $this->assertDatabaseCount('livestock_contest_histories', 0);
     }
 
     public function test_peternak_dapat_mengubah_ternak_milik_tokonya(): void
