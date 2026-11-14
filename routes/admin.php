@@ -3,6 +3,7 @@
 use App\Http\Controllers\Admin\StoreVerificationController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Admin\CommodityTypeController;
+use App\Http\Controllers\Admin\FinanceRankingController;
 
 /*
 |--------------------------------------------------------------------------
@@ -31,6 +32,12 @@ Route::middleware(['auth', 'role:admin'])->prefix('admin')->name('admin.')->grou
         Route::get('/{type}', [CommodityTypeController::class, 'show'])->name('show');
         Route::put('/{type}', [CommodityTypeController::class, 'update'])->name('update');
         Route::post('/{type}/status', [CommodityTypeController::class, 'toggle'])->name('toggle');
+    });
+
+        // UC-22 Peringkat keuangan
+    Route::prefix('peringkat-keuangan')->name('peringkat-keuangan.')->group(function () {
+        Route::get('/', [FinanceRankingController::class, 'index'])->name('index');
+        Route::get('/ekspor', [FinanceRankingController::class, 'ekspor'])->name('ekspor');
     });
 });
 

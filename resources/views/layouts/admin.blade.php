@@ -22,7 +22,7 @@
         ],
         'DATA & LAPORAN' => [
             ['Data Induk', 'admin.data-induk.index', 'admin/data-induk*'],
-            ['Peringkat Keuangan', 'admin.laporan.index', 'admin/laporan*'],
+            ['Peringkat Keuangan', 'admin.peringkat-keuangan.index', 'admin/peringkat-keuangan*'],
         ],
     ];
     $authUser = auth()->user();
