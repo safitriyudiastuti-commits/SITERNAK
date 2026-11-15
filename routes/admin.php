@@ -3,6 +3,7 @@
 use App\Http\Controllers\Admin\StoreVerificationController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Admin\CommodityTypeController;
+use App\Http\Controllers\Admin\CertificateVerificationController;
 
 /*
 |--------------------------------------------------------------------------
@@ -22,6 +23,14 @@ Route::middleware(['auth', 'role:admin'])->prefix('admin')->name('admin.')->grou
         Route::get('/{store}', [StoreVerificationController::class, 'show'])->name('show');
         Route::post('/{store}/keputusan', [StoreVerificationController::class, 'verify'])->name('verify');
         Route::get('/{store}/dokumen/{document}', [StoreVerificationController::class, 'document'])->name('dokumen');
+    });
+
+        // UC-20 Verifikasi sertifikat kontes
+    Route::prefix('verifikasi-sertifikat')->name('verifikasi-sertifikat.')->group(function () {
+        Route::get('/', [CertificateVerificationController::class, 'index'])->name('index');
+        Route::get('/{certificate}', [CertificateVerificationController::class, 'show'])->name('show');
+        Route::post('/{certificate}/keputusan', [CertificateVerificationController::class, 'verify'])->name('verify');
+        Route::get('/{certificate}/berkas', [CertificateVerificationController::class, 'berkas'])->name('berkas');
     });
 
         // UC-21 Data induk komoditas
