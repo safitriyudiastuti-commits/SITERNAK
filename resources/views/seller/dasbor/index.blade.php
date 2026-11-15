@@ -87,26 +87,28 @@
             </div>
         </article>
 
-        <article class="dashboard-card p-5 xl:col-span-2">
-            <h2 class="font-semibold text-gray-900">Perlu tindakan</h2>
-            <ul class="mt-3 divide-y divide-gray-100">
-                @foreach ($actions as $item)
-                    <li class="flex items-start gap-3 py-3 first:pt-1 last:pb-0">
-                        <span class="dashboard-tone-{{ $item['tone'] }} flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-sm font-bold">
-                            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" class="h-4 w-4">
-                                <path d="M12 3 2.8 19h18.4L12 3Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>
-                                <path d="M12 9v4m0 3h.01" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
-                            </svg>
-                        </span>
-                        <div class="min-w-0 flex-1">
-                            <p class="text-xs font-semibold text-gray-900">{{ $item['title'] }}</p>
-                            <p class="mt-1 text-[11px] text-gray-500">{{ $item['description'] }}</p>
-                        </div>
-                        <span class="text-[11px] font-semibold text-[#2d5a27]">{{ $item['action'] }}</span>
-                    </li>
-                @endforeach
-            </ul>
-        </article>
+        @if ($actions !== [])
+            <article class="dashboard-card p-5 xl:col-span-2">
+                <h2 class="font-semibold text-gray-900">Perlu tindakan</h2>
+                <ul class="mt-3 divide-y divide-gray-100">
+                    @foreach ($actions as $item)
+                        <li class="flex items-start gap-3 py-3 first:pt-1 last:pb-0">
+                            <span class="dashboard-tone-{{ $item['tone'] }} flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-sm font-bold">
+                                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" class="h-4 w-4">
+                                    <path d="M12 3 2.8 19h18.4L12 3Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>
+                                    <path d="M12 9v4m0 3h.01" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+                                </svg>
+                            </span>
+                            <div class="min-w-0 flex-1">
+                                <p class="text-xs font-semibold text-gray-900">{{ $item['title'] }}</p>
+                                <p class="mt-1 text-[11px] text-gray-500">{{ $item['description'] }}</p>
+                            </div>
+                            <a href="{{ $item['href'] }}" class="text-[11px] font-semibold text-[#2d5a27] hover:underline">{{ $item['action'] }}</a>
+                        </li>
+                    @endforeach
+                </ul>
+            </article>
+        @endif
     </section>
 
     <section class="dashboard-card overflow-hidden">
