@@ -4,7 +4,7 @@
 
 @section('content')
 @php
-    $livestockTotal = $categories->sum(fn ($category) => $category->livestock->count());
+    $livestockTotal = $livestock->total();
 @endphp
 <style>
     .livestock-page { --livestock-green: #2d5a27; }
@@ -35,39 +35,62 @@
     </header>
 
     <div class="flex flex-col gap-3 xl:flex-row xl:items-center">
-        <label class="relative block w-full xl:max-w-72">
-            <span class="sr-only">Cari nama atau jenis ternak</span>
-            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500">
-                <circle cx="10.8" cy="10.8" r="6.3" stroke="currentColor" stroke-width="1.7"/>
-                <path d="m15.5 15.5 4.2 4.2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
-            </svg>
-            <input id="livestock-search" type="search" placeholder="Cari nama atau jenis ternak"
-                   class="w-full rounded-lg border border-gray-200 bg-white py-2 pl-9 pr-3 text-xs outline-none focus:border-[#2d5a27] focus:ring-2 focus:ring-[#2d5a27]/10">
-        </label>
+        <form method="GET" action="{{ route('seller.ternak.index') }}" class="contents">
+            @if ($selectedCategory !== '')
+                <input type="hidden" name="kategori" value="{{ $selectedCategory }}">
+            @endif
+            @if ($selectedStatus !== '')
+                <input type="hidden" name="status" value="{{ $selectedStatus }}">
+            @endif
+            <label class="relative block w-full xl:max-w-72">
+                <span class="sr-only">Cari nama atau jenis ternak</span>
+                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500">
+                    <circle cx="10.8" cy="10.8" r="6.3" stroke="currentColor" stroke-width="1.7"/>
+                    <path d="m15.5 15.5 4.2 4.2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+                </svg>
+                <input id="livestock-search" name="q" type="search" value="{{ $selectedSearch }}" placeholder="Cari nama atau jenis ternak"
+                       class="w-full rounded-lg border border-gray-200 bg-white py-2 pl-9 pr-3 text-xs outline-none focus:border-[#2d5a27] focus:ring-2 focus:ring-[#2d5a27]/10">
+            </label>
+        </form>
 
         <div class="flex flex-wrap gap-1.5" role="group" aria-label="Filter kategori ternak">
-            <button type="button" data-category-filter="all" class="livestock-filter is-selected rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700">
+            <a href="{{ route('seller.ternak.index', array_filter(['q' => $selectedSearch, 'status' => $selectedStatus], fn ($value) => $value !== '')) }}"
+               @if ($selectedCategory === '') aria-current="true" @endif
+               class="livestock-filter {{ $selectedCategory === '' ? 'is-selected' : '' }} rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700">
                 Semua
-            </button>
+            </a>
             @foreach ($categories as $category)
-                <button type="button" data-category-filter="{{ $category->id }}"
-                        class="livestock-filter rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:border-[#2d5a27]">
+                @php
+                    $categorySlug = \Illuminate\Support\Str::slug($category->name);
+                    $categorySelected = $selectedCategory === (string) $category->id || $selectedCategory === $categorySlug;
+                @endphp
+                <a href="{{ route('seller.ternak.index', array_filter(['q' => $selectedSearch, 'kategori' => $category->id, 'status' => $selectedStatus], fn ($value) => $value !== '')) }}"
+                   @if ($categorySelected) aria-current="true" @endif
+                   class="livestock-filter {{ $categorySelected ? 'is-selected' : '' }} rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:border-[#2d5a27]">
                     {{ $category->name }}
-                </button>
+                </a>
             @endforeach
         </div>
 
-        <label class="relative block xl:ml-auto xl:w-40">
+        <form id="livestock-status-form" method="GET" action="{{ route('seller.ternak.index') }}" class="relative block xl:ml-auto xl:w-40">
             <span class="sr-only">Filter status</span>
-            <select id="livestock-status" class="w-full appearance-none rounded-lg border border-gray-200 bg-white px-3 py-2 pr-8 text-xs text-gray-700 outline-none focus:border-[#2d5a27]">
+            @if ($selectedSearch !== '')
+                <input type="hidden" name="q" value="{{ $selectedSearch }}">
+            @endif
+            @if ($selectedCategory !== '')
+                <input type="hidden" name="kategori" value="{{ $selectedCategory }}">
+            @endif
+            <select id="livestock-status" name="status" class="w-full appearance-none rounded-lg border border-gray-200 bg-white px-3 py-2 pr-8 text-xs text-gray-700 outline-none focus:border-[#2d5a27]">
                 <option value="all">Semua status</option>
-                <option value="aktif">Tersedia</option>
-                <option value="nonaktif">Nonaktif</option>
+                @foreach (['aktif' => 'Tersedia', 'nonaktif' => 'Nonaktif', 'tersedia' => 'Tersedia', 'dalam_proses' => 'Dalam proses', 'terjual' => 'Terjual'] as $value => $label)
+                    <option value="{{ $value }}" @selected($selectedStatus === $value)>{{ $label }}</option>
+                @endforeach
             </select>
             <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" class="pointer-events-none absolute right-3 top-1/2 h-3 w-3 -translate-y-1/2 text-gray-500">
                 <path d="m7 10 5 5 5-5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
-        </label>
+            <button type="submit" class="sr-only">Terapkan status</button>
+        </form>
     </div>
 
     <div class="overflow-hidden rounded-xl border border-gray-200 bg-white">
@@ -163,7 +186,7 @@
                                         <button type="button"
                                                 aria-label="Hapus {{ $displayName }}"
                                                 title="Hapus"
-                                                onclick="document.getElementById('hapus-{{ $item->id }}').showModal()"
+                                                onclick="document.getElementById('hapus-{{ $item->id }}')?.showModal()"
                                                 class="rounded-lg border border-gray-200 p-2 text-red-600 hover:border-red-300 hover:bg-red-50">
                                             <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" class="h-4 w-4">
                                                 <path d="M4 7h16M10 11v6m4-6v6M6 7l1 14h10l1-14M9 7V4h6v3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
@@ -174,20 +197,23 @@
                             </tr>
                         @endforeach
                     @endforeach
-                    <tr id="livestock-empty" hidden>
-                        <td colspan="7" class="px-4 py-10 text-center text-sm text-gray-500">
-                            Tidak ada ternak yang cocok dengan pencarian atau filter.
-                        </td>
-                    </tr>
+                    @if ($livestock->count() === 0)
+                        <tr>
+                            <td colspan="7" class="px-4 py-10 text-center text-sm text-gray-500">
+                                Tidak ada ternak yang cocok
+                            </td>
+                        </tr>
+                    @endif
                 </tbody>
             </table>
         </div>
     </div>
 
     <div class="flex flex-wrap items-center justify-between gap-3 text-xs text-gray-500">
-        <p>Menampilkan <span id="livestock-visible-count">{{ $livestockTotal }}</span> dari {{ $livestockTotal }} data ternak</p>
+        <p>Menampilkan {{ $livestock->firstItem() ?? 0 }}-{{ $livestock->lastItem() ?? 0 }} dari {{ $livestockTotal }} data ternak</p>
         <span class="rounded-lg border border-gray-200 bg-white px-3 py-2 text-gray-600">Daftar ternak</span>
     </div>
+    {{ $livestock->links() }}
 
     @foreach ($categories as $category)
         @foreach ($category->livestock as $item)
@@ -200,7 +226,7 @@
                         Data {{ $item->nama_kode ?: $item->commodityType->name }} dan semua media terkait akan dihapus.
                     </p>
                     <div class="mt-5 flex justify-end gap-2">
-                        <button type="button" onclick="this.closest('dialog').close()"
+                        <button type="button" onclick="this.closest('dialog')?.close()"
                                 class="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
                             Batal
                         </button>
@@ -217,38 +243,9 @@
 
 <script>
     (() => {
-        const search = document.getElementById('livestock-search');
         const status = document.getElementById('livestock-status');
-        const rows = [...document.querySelectorAll('.livestock-row')];
-        const categoryButtons = [...document.querySelectorAll('[data-category-filter]')];
-        const emptyRow = document.getElementById('livestock-empty');
-        const visibleCount = document.getElementById('livestock-visible-count');
-        let selectedCategory = 'all';
-
-        function applyFilters() {
-            const query = search.value.trim().toLocaleLowerCase('id');
-            let visible = 0;
-            rows.forEach((row) => {
-                const matches = (selectedCategory === 'all' || row.dataset.category === selectedCategory)
-                    && (status.value === 'all' || row.dataset.status === status.value)
-                    && row.textContent.toLocaleLowerCase('id').includes(query);
-                row.hidden = !matches;
-                if (matches) visible++;
-            });
-            emptyRow.hidden = visible !== 0;
-            visibleCount.textContent = visible;
-        }
-
-        categoryButtons.forEach((button) => {
-            button.addEventListener('click', () => {
-                selectedCategory = button.dataset.categoryFilter;
-                categoryButtons.forEach((item) => item.classList.toggle('is-selected', item === button));
-                applyFilters();
-            });
-        });
-        search.addEventListener('input', applyFilters);
-        status.addEventListener('change', applyFilters);
-        applyFilters();
+        const statusForm = document.getElementById('livestock-status-form');
+        status?.addEventListener('change', () => statusForm?.requestSubmit());
     })();
 </script>
 @endsection

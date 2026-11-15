@@ -14,6 +14,7 @@ use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\View\View;
 use RuntimeException;
 use Throwable;
@@ -29,20 +30,61 @@ class LivestockController extends Controller
             ->orderBy('name')
             ->get();
 
-        $livestock = Livestock::query()
+        $search = $request->query('q');
+        $search = is_string($search) ? trim($search) : '';
+        $categoryFilter = $request->query('kategori');
+        $statusFilter = $request->query('status');
+        $availableStatuses = ['all', 'aktif', 'nonaktif', 'tersedia', 'dalam_proses', 'terjual'];
+        if (! is_string($statusFilter) || ! in_array($statusFilter, $availableStatuses, true)) {
+            $statusFilter = '';
+        }
+
+        $livestockQuery = Livestock::query()
             ->with(['commodityType.category', 'media', 'contestHistories'])
             ->where('store_id', $store->id)
-            ->latest()
-            ->get();
+            ->when($search !== '', function ($query) use ($search): void {
+                $term = '%'.mb_strtolower($search).'%';
+                $query->where(function ($query) use ($term): void {
+                    $query->whereRaw('LOWER(nama_kode) LIKE ?', [$term])
+                        ->orWhereRaw('LOWER(ras) LIKE ?', [$term])
+                        ->orWhereHas('commodityType', fn ($typeQuery) => $typeQuery
+                            ->whereRaw('LOWER(name) LIKE ?', [$term]));
+                });
+            })
+            ->when(is_string($statusFilter) && $statusFilter !== '' && $statusFilter !== 'all', function ($query) use ($statusFilter): void {
+                $query->where('status', $statusFilter);
+            })
+            ->when(is_string($categoryFilter) && $categoryFilter !== '' && $categoryFilter !== 'all', function ($query) use ($categoryFilter, $categories): void {
+                $categoryIds = is_numeric($categoryFilter)
+                    ? $categories->where('id', (int) $categoryFilter)->pluck('id')
+                    : $categories
+                        ->filter(fn (CommodityCategory $category): bool => Str::slug($category->name) === $categoryFilter)
+                        ->pluck('id');
+
+                $query->whereIn('commodity_type_id', CommodityType::query()
+                    ->select('id')
+                    ->whereIn('category_id', $categoryIds));
+            })
+            ->latest();
+        $livestock = $livestockQuery->paginate(8)->withQueryString();
 
         $categories->each(function (CommodityCategory $category) use ($livestock): void {
             $category->setRelation(
                 'livestock',
-                $livestock->filter(fn (Livestock $item) => $item->commodityType?->category_id === $category->id)->values()
+                $livestock->getCollection()
+                    ->filter(fn (Livestock $item) => $item->commodityType?->category_id === $category->id)
+                    ->values()
             );
         });
 
-        return view('seller.ternak.index', compact('categories', 'store'));
+        return view('seller.ternak.index', [
+            'categories' => $categories,
+            'livestock' => $livestock,
+            'selectedSearch' => $search,
+            'selectedCategory' => is_string($categoryFilter) ? $categoryFilter : '',
+            'selectedStatus' => is_string($statusFilter) ? $statusFilter : '',
+            'store' => $store,
+        ]);
     }
 
     public function show(Request $request, int $livestock): View
