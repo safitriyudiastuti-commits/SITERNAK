@@ -3,60 +3,67 @@
 namespace App\Http\Controllers\Buyer;
 
 use App\Http\Controllers\Controller;
+use App\Models\Order;
+use App\Models\OrderStatusHistory;
+use App\Models\Livestock;
 use App\Support\SumberKatalog;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 
-/**
- * Halaman Pemesanan (UC-11): ringkasan, data pembeli, metode pembayaran.
- * Aturan COD: hanya jika kota pembeli = kota peternak.
- */
 class PemesananController extends Controller
 {
     public function create(Request $request)
     {
         $data = $request->validate([
-            'tipe'   => ['required', 'in:individual,batch,produk'],
-            'item'   => ['required', 'integer'],
+            'tipe' => ['required', 'in:individual,batch,produk'],
+            'item' => ['required', 'integer'],
             'jumlah' => ['nullable', 'numeric', 'min:1'],
         ]);
 
         $r = SumberKatalog::cari($data['tipe'], (int) $data['item']);
+
         abort_unless($r, 404, 'Barang ini sudah tidak tersedia.');
 
-        $jumlah = $r->tipe === 'individual'
+        // Data contoh tidak boleh digunakan untuk transaksi.
+        $livestock = $this->ambilLivestockAsli($r);
+
+        abort_unless($livestock, 404, 'Barang asli tidak ditemukan.');
+
+        $jumlah = $livestock->mode === 'individual'
             ? 1
-            : min(max(1, (float) ($data['jumlah'] ?? 1)), (float) $r->stok);
+            : min(
+                max(1, (float) ($data['jumlah'] ?? 1)),
+                (float) $livestock->stok
+            );
 
         $u = $request->user();
         $kotaPembeli = old('kota_kabupaten', $u->kota_kabupaten);
 
         return view('buyer.pemesanan.create', [
-            'r'           => $r,
-            'jumlah'      => $jumlah,
-            'u'           => $u,
+            'r' => $r,
+            'jumlah' => $jumlah,
+            'u' => $u,
             'kotaPembeli' => $kotaPembeli,
-            'codBisa'     => self::kotaKey($kotaPembeli) === self::kotaKey($r->kota),
+            'codBisa' => self::kotaKey($kotaPembeli) === self::kotaKey($r->kota),
         ]);
     }
 
     public function store(Request $request)
     {
         $data = $request->validate([
-            'tipe'            => ['required', 'in:individual,batch,produk'],
-            'item'            => ['required', 'integer'],
-            'jumlah'          => ['required', 'numeric', 'min:1'],
-            'nama_penerima'   => ['required', 'string', 'max:100'],
-            'no_hp_penerima'  => ['required', 'string', 'regex:/^[0-9+\-\s]{8,20}$/'],
+            'tipe' => ['required', 'in:individual,batch,produk'],
+            'item' => ['required', 'integer'],
+            'jumlah' => ['required', 'numeric', 'min:1'],
+            'nama_penerima' => ['required', 'string', 'max:100'],
+            'no_hp_penerima' => ['required', 'string', 'regex:/^[0-9+\-\s]{8,20}$/'],
             'alamat_penerima' => ['required', 'string', 'max:255'],
-            'kota_kabupaten'  => ['required', 'string', 'max:100'],
-            'provinsi'        => ['required', 'string', 'max:100'],
-            'metode_bayar'    => ['required', 'in:transfer_bank,qris,cod'],
+            'kota_kabupaten' => ['required', 'string', 'max:100'],
+            'provinsi' => ['required', 'string', 'max:100'],
+            'metode_bayar' => ['required', 'in:transfer_bank,qris,cod'],
         ], [
             'metode_bayar.required' => 'Pilih salah satu metode pembayaran.',
-            'no_hp_penerima.regex'  => 'Nomor HP/WhatsApp tidak valid.',
+            'no_hp_penerima.regex' => 'Nomor HP/WhatsApp tidak valid.',
         ]);
 
         $r = SumberKatalog::cari($data['tipe'], (int) $data['item']);
@@ -65,69 +72,123 @@ class PemesananController extends Controller
             return back()->withInput()->with('error', 'Barang ini sudah tidak tersedia.');
         }
 
-        $jumlah = $r->tipe === 'individual' ? 1 : (float) $data['jumlah'];
+        $livestock = $this->ambilLivestockAsli($r);
 
-        if ($jumlah > $r->stok) {
-            return back()->withInput()->withErrors(['jumlah' => "Jumlah melebihi stok tersedia ({$r->stok} {$r->satuan})."]);
+        if (! $livestock) {
+            return back()->withInput()->with(
+                'error',
+                'Data ini masih berupa data contoh dan belum bisa dipesan.'
+            );
         }
 
-        if ($data['metode_bayar'] === 'cod' && self::kotaKey($data['kota_kabupaten']) !== self::kotaKey($r->kota)) {
-            return back()->withInput()->withErrors(['metode_bayar' => 'COD hanya tersedia jika kota/kabupaten Anda sama dengan peternak.']);
+        $jumlah = $livestock->mode === 'individual'
+            ? 1
+            : (float) $data['jumlah'];
+
+        if ($jumlah > $livestock->stok) {
+            return back()->withInput()->withErrors([
+                'jumlah' => "Jumlah melebihi stok tersedia ({$livestock->stok} {$livestock->satuan_jual}).",
+            ]);
         }
 
-        $tabel = ['individual' => 'livestocks', 'batch' => 'livestock_batches', 'produk' => 'products'][$r->tipe];
+        $store = $livestock->store;
 
-        // Tabel pesanan/ternak dibuat tim. Selama belum ada, pesanan belum bisa disimpan.
-        if (! Schema::hasTable('orders') || ! Schema::hasTable($tabel)) {
-            return back()->withInput()->with('error', 'Tabel pesanan belum tersedia, jadi pesanan belum bisa disimpan.');
+        if (! $store || $store->status !== 'verified') {
+            return back()->withInput()->with(
+                'error',
+                'Toko peternak belum terverifikasi atau tidak tersedia.'
+            );
         }
 
-        $id = DB::transaction(function () use ($data, $r, $jumlah, $tabel, $request) {
-            // Tahan stok / kunci ternak secara atomik: gagal jika sudah diambil pembeli lain.
-            $ditahan = $r->tipe === 'individual'
-                ? DB::table($tabel)->where('id', $r->id)->where('status', 'tersedia')->update(['status' => 'dalam_proses'])
-                : DB::table($tabel)->where('id', $r->id)->whereRaw('stok_tersedia - stok_ditahan >= ?', [$jumlah])->increment('stok_ditahan', $jumlah);
+        if (
+            $data['metode_bayar'] === 'cod'
+            && self::kotaKey($data['kota_kabupaten']) !== self::kotaKey($store->city)
+        ) {
+            return back()->withInput()->withErrors([
+                'metode_bayar' => 'COD hanya tersedia jika kota/kabupaten Anda sama dengan peternak.',
+            ]);
+        }
 
-            if (! $ditahan) {
-                throw ValidationException::withMessages(['jumlah' => 'Stok sudah tidak mencukupi atau sudah dipesan pembeli lain.']);
+        $id = DB::transaction(function () use ($data, $livestock, $jumlah, $request) {
+            $barang = Livestock::whereKey($livestock->id)
+                ->lockForUpdate()
+                ->first();
+
+            if (
+                ! $barang
+                || $barang->status !== 'aktif'
+                || $barang->stok < $jumlah
+            ) {
+                throw ValidationException::withMessages([
+                    'jumlah' => 'Stok sudah tidak mencukupi atau barang tidak tersedia.',
+                ]);
             }
 
-            $id = DB::table('orders')->insertGetId([
-                'pembeli_id'              => $request->user()->id,
-                'peternak_id'             => $r->penjual_id,
-                'tipe_item'               => $r->tipe,
-                'livestock_id'            => $r->tipe === 'individual' ? $r->id : null,
-                'livestock_batch_id'      => $r->tipe === 'batch' ? $r->id : null,
-                'product_id'              => $r->tipe === 'produk' ? $r->id : null,
-                'nama_item'               => $r->nama,
-                'satuan'                  => $r->satuan,
-                'harga_satuan'            => $r->harga,
-                'jumlah'                  => $jumlah,
-                'total_harga'             => (int) round($r->harga * $jumlah),
-                'metode_bayar'            => $data['metode_bayar'],
-                'status'                  => 'menunggu_konfirmasi',
-                'nama_penerima'           => $data['nama_penerima'],
-                'no_hp_penerima'          => $data['no_hp_penerima'],
-                'alamat_penerima'         => $data['alamat_penerima'],
+            $barang->stok -= $jumlah;
+
+            if ($barang->mode === 'individual') {
+                $barang->status = 'dalam_proses';
+            }
+
+            $barang->save();
+
+            $order = Order::create([
+                'nomor_order' => 'TEMP-' . uniqid(),
+                'buyer_id' => $request->user()->id,
+                'store_id' => $barang->store_id,
+                'livestock_id' => $barang->id,
+                'nama_item' => $barang->nama_kode ?: 'Ternak',
+                'tipe_item' => $barang->mode,
+                'jumlah' => $jumlah,
+                'satuan' => $barang->satuan_jual,
+                'harga_satuan' => $barang->harga,
+                'total_harga' => round($barang->harga * $jumlah),
+                'metode_bayar' => $data['metode_bayar'],
+                'status' => 'menunggu_konfirmasi',
+                'nama_penerima' => $data['nama_penerima'],
+                'no_hp_penerima' => $data['no_hp_penerima'],
+                'alamat_penerima' => $data['alamat_penerima'],
                 'kota_kabupaten_penerima' => $data['kota_kabupaten'],
-                'provinsi_penerima'       => $data['provinsi'],
-                'created_at'              => now(),
-                'updated_at'              => now(),
+                'provinsi_penerima' => $data['provinsi'],
             ]);
 
-            DB::table('orders')->where('id', $id)->update([
-                'nomor_order' => sprintf('ORD-%s-%04d', now()->format('ymd'), $id),
+            $order->update([
+                'nomor_order' => sprintf(
+                    'ORD-%s-%04d',
+                    now()->format('ymd'),
+                    $order->id
+                ),
             ]);
 
-            return $id;
+            OrderStatusHistory::create([
+                'order_id' => $order->id,
+                'actor_id' => $request->user()->id,
+                'status' => 'menunggu_konfirmasi',
+                'keterangan' => 'Pesanan berhasil dibuat.',
+                'created_at' => now(),
+            ]);
+
+            return $order->id;
         });
 
         return redirect()
-            ->to(\Illuminate\Support\Facades\Route::has('buyer.pesanan.show') ? route('buyer.pesanan.show', $id) : route('buyer.katalog.index'))
+            ->route('buyer.pesanan.show', $id)
             ->with('success', 'Pesanan dibuat. Menunggu konfirmasi peternak.');
     }
 
-    /** "Kota Surabaya", "Kab. Banyuwangi", dan "banyuwangi" dianggap sama. */
+    private function ambilLivestockAsli(object $r): ?Livestock
+    {
+        if (! isset($r->id, $r->tipe)) {
+            return null;
+        }
+
+        return Livestock::with('store')
+            ->whereKey($r->id)
+            ->where('mode', $r->tipe)
+            ->where('status', 'aktif')
+            ->first();
+    }
+
     private static function kotaKey(?string $nilai): string
     {
         $nilai = mb_strtolower(trim((string) $nilai));
