@@ -6,6 +6,7 @@ use App\Enums\StoreStatus;
 use App\Models\CommodityCategory;
 use App\Models\CommodityType;
 use App\Models\Livestock;
+use App\Models\LivestockContestHistory;
 use App\Models\LivestockMedia;
 use App\Models\Store;
 use App\Models\User;
@@ -105,7 +106,11 @@ class LivestockTest extends TestCase
             ->assertSee('name="mode"', false)
             ->assertSee('name="purpose"', false)
             ->assertSee('name="stok"', false)
-            ->assertSee('name="media[]"', false);
+            ->assertSee('name="media[]"', false)
+            ->assertSee('id="contest-card"', false)
+            ->assertSee('name="contest[contest_name]"', false)
+            ->assertSee('name="contest[category]"', false)
+            ->assertSee('name="contest[certificate]"', false);
 
         $this->actingAs($store->owner)
             ->post(route('seller.ternak.store'), $data)
@@ -141,6 +146,94 @@ class LivestockTest extends TestCase
             'stok' => 1,
         ]);
         $this->assertDatabaseCount('livestock_media', 1);
+    }
+
+    public function test_menambah_ternak_dan_riwayat_kontes_dalam_satu_transaksi(): void
+    {
+        Storage::fake('private');
+        Storage::fake('public');
+        $store = $this->activeStore();
+        $this->individualType->update(['contest_categories' => ['Postur', 'Bobot badan']]);
+
+        $this->actingAs($store->owner)
+            ->post(route('seller.ternak.store'), $this->validData([
+                'commodity_type_id' => $this->individualType->id,
+                'mode' => 'individual',
+                'purpose' => 'bibit',
+                'jumlah' => null,
+                'stok' => 1,
+                'contest' => [
+                    'contest_name' => 'Kontes Sapi Jawa Timur 2025',
+                    'category' => 'Postur',
+                    'rank' => 'Juara 2',
+                    'contest_date' => '2025-08-14',
+                    'organizer' => 'Dinas Peternakan Jatim',
+                    'certificate' => UploadedFile::fake()->create('sertifikat.pdf', 200, 'application/pdf'),
+                ],
+            ]))
+            ->assertRedirect(route('seller.ternak.index'))
+            ->assertSessionHas('success', 'Data ternak berhasil ditambahkan.');
+
+        $livestock = Livestock::query()->where('store_id', $store->id)->firstOrFail();
+        $history = LivestockContestHistory::query()->where('livestock_id', $livestock->id)->firstOrFail();
+        $this->assertSame('pending', $history->status);
+        $this->assertDatabaseHas('livestock_contest_histories', [
+            'livestock_id' => $livestock->id,
+            'contest_name' => 'Kontes Sapi Jawa Timur 2025',
+            'category' => 'Postur',
+            'rank' => 'Juara 2',
+            'status' => 'pending',
+        ]);
+        Storage::disk('private')->assertExists($history->certificate_path);
+        Storage::disk('public')->assertMissing($history->certificate_path);
+    }
+
+    public function test_riwayat_kontes_yang_diisi_sebagian_ditolak_dan_old_input_dipertahankan(): void
+    {
+        $store = $this->activeStore();
+        $this->individualType->update(['contest_categories' => ['Postur']]);
+
+        $this->actingAs($store->owner)
+            ->from(route('seller.ternak.create'))
+            ->post(route('seller.ternak.store'), $this->validData([
+                'commodity_type_id' => $this->individualType->id,
+                'mode' => 'individual',
+                'purpose' => 'bibit',
+                'jumlah' => null,
+                'stok' => 1,
+                'contest' => [
+                    'contest_name' => 'Kontes Sapi Jawa Timur 2025',
+                    'category' => '',
+                    'rank' => '',
+                    'contest_date' => '',
+                    'organizer' => '',
+                ],
+            ]))
+            ->assertRedirect(route('seller.ternak.create'))
+            ->assertSessionHasErrors([
+                'contest.category',
+                'contest.rank',
+                'contest.contest_date',
+                'contest.organizer',
+                'contest.certificate',
+            ])
+            ->assertSessionHas('_old_input.contest.contest_name', 'Kontes Sapi Jawa Timur 2025');
+
+        $this->assertDatabaseCount('livestock', 0);
+        $this->assertDatabaseCount('livestock_contest_histories', 0);
+    }
+
+    public function test_mode_batch_tidak_menyimpan_riwayat_kontes(): void
+    {
+        $store = $this->activeStore();
+
+        $this->actingAs($store->owner)
+            ->post(route('seller.ternak.store'), $this->validData())
+            ->assertRedirect(route('seller.ternak.index'))
+            ->assertSessionHas('success');
+
+        $this->assertDatabaseCount('livestock', 1);
+        $this->assertDatabaseCount('livestock_contest_histories', 0);
     }
 
     public function test_peternak_dapat_mengubah_ternak_milik_tokonya(): void
@@ -285,6 +378,188 @@ class LivestockTest extends TestCase
         $this->assertDatabaseHas('livestock', ['id' => $item->id, 'jumlah' => 3]);
     }
 
+    public function test_pencarian_daftar_ternak_mencocokkan_nama_ras_dan_jenis_tanpa_membedakan_huruf(): void
+    {
+        $store = $this->activeStore();
+        $this->createIndexedLivestock($store, $this->batchType, [
+            'nama_kode' => 'Ayam Cemani',
+            'ras' => 'Kedu',
+        ]);
+        $this->createIndexedLivestock($store, $this->batchType, [
+            'nama_kode' => 'Sapi Kelompok',
+            'ras' => 'Brahma',
+        ]);
+        $this->createIndexedLivestock($store, $this->individualType, [
+            'nama_kode' => 'Domba pilihan',
+            'ras' => 'Merino',
+        ]);
+
+        $this->actingAs($store->owner)
+            ->get(route('seller.ternak.index', ['q' => 'cEmAnI']))
+            ->assertOk()
+            ->assertSeeText('Ayam Cemani')
+            ->assertDontSeeText('Sapi Kelompok')
+            ->assertSeeText('Menampilkan 1-1 dari 1 data ternak');
+
+        $this->actingAs($store->owner)
+            ->get(route('seller.ternak.index', ['q' => 'bRaHmA']))
+            ->assertOk()
+            ->assertSeeText('Sapi Kelompok')
+            ->assertDontSeeText('Ayam Cemani');
+
+        $this->actingAs($store->owner)
+            ->get(route('seller.ternak.index', ['q' => 'bRaHmAn']))
+            ->assertOk()
+            ->assertSeeText('Domba pilihan')
+            ->assertDontSeeText('Sapi Kelompok');
+    }
+
+    public function test_filter_kategori_menerima_id_atau_slug_dan_menandai_chip_aktif(): void
+    {
+        $store = $this->activeStore();
+        $birdCategory = CommodityCategory::query()->create([
+            'group' => 'ternak_hidup',
+            'name' => 'Unggas',
+            'sort_order' => 2,
+            'is_active' => true,
+        ]);
+        $birdType = CommodityType::query()->create([
+            'category_id' => $birdCategory->id,
+            'name' => 'Ayam Kampung',
+            'selling_modes' => ['batch'],
+            'purposes' => ['pembesaran'],
+            'form_fields' => CommodityType::DEFAULT_FORM_FIELDS,
+            'is_active' => true,
+        ]);
+        $this->createIndexedLivestock($store, $this->batchType, ['nama_kode' => 'Sapi pilihan']);
+        $this->createIndexedLivestock($store, $birdType, ['nama_kode' => 'Ayam pilihan']);
+
+        $this->actingAs($store->owner)
+            ->get(route('seller.ternak.index', ['kategori' => $birdCategory->id]))
+            ->assertOk()
+            ->assertSeeText('Ayam pilihan')
+            ->assertDontSeeText('Sapi pilihan')
+            ->assertSee('aria-current="true"', false);
+
+        $this->actingAs($store->owner)
+            ->get(route('seller.ternak.index', ['kategori' => 'unggas']))
+            ->assertOk()
+            ->assertSeeText('Ayam pilihan')
+            ->assertDontSeeText('Sapi pilihan')
+            ->assertSee('aria-current="true"', false);
+    }
+
+    public function test_filter_status_mencocokkan_nilai_status_ternak(): void
+    {
+        $store = $this->activeStore();
+        $this->createIndexedLivestock($store, $this->batchType, [
+            'nama_kode' => 'Ternak tersedia',
+            'status' => 'aktif',
+        ]);
+        $this->createIndexedLivestock($store, $this->batchType, [
+            'nama_kode' => 'Ternak nonaktif',
+            'status' => 'nonaktif',
+        ]);
+        $this->createIndexedLivestock($store, $this->batchType, [
+            'nama_kode' => 'Ternak terjual',
+            'status' => 'terjual',
+        ]);
+
+        $this->actingAs($store->owner)
+            ->get(route('seller.ternak.index', ['status' => 'terjual']))
+            ->assertOk()
+            ->assertSeeText('Ternak terjual')
+            ->assertDontSeeText('Ternak tersedia')
+            ->assertSee('value="terjual" selected', false);
+    }
+
+    public function test_filter_pencarian_kategori_dan_status_dapat_dikombinasikan(): void
+    {
+        $store = $this->activeStore();
+        $birdCategory = CommodityCategory::query()->create([
+            'group' => 'ternak_hidup',
+            'name' => 'Ternak kecil',
+            'sort_order' => 2,
+            'is_active' => true,
+        ]);
+        $birdType = CommodityType::query()->create([
+            'category_id' => $birdCategory->id,
+            'name' => 'Kambing Etawa',
+            'selling_modes' => ['batch'],
+            'purposes' => ['pembesaran'],
+            'form_fields' => CommodityType::DEFAULT_FORM_FIELDS,
+            'is_active' => true,
+        ]);
+        $this->createIndexedLivestock($store, $birdType, [
+            'nama_kode' => 'Etawa A',
+            'status' => 'aktif',
+        ]);
+        $this->createIndexedLivestock($store, $birdType, [
+            'nama_kode' => 'Etawa B',
+            'status' => 'nonaktif',
+        ]);
+        $this->createIndexedLivestock($store, $this->batchType, [
+            'nama_kode' => 'Etawa sapi',
+            'status' => 'aktif',
+        ]);
+
+        $this->actingAs($store->owner)
+            ->get(route('seller.ternak.index', [
+                'q' => 'etawa',
+                'kategori' => 'ternak-kecil',
+                'status' => 'aktif',
+            ]))
+            ->assertOk()
+            ->assertSeeText('Etawa A')
+            ->assertDontSeeText('Etawa B')
+            ->assertDontSeeText('Etawa sapi')
+            ->assertSeeText('Menampilkan 1-1 dari 1 data ternak');
+    }
+
+    public function test_pagination_menampilkan_delapan_data_dan_mempertahankan_query_filter(): void
+    {
+        $store = $this->activeStore();
+        for ($index = 1; $index <= 10; $index++) {
+            $this->createIndexedLivestock($store, $this->batchType, [
+                'nama_kode' => "Limousin {$index}",
+                'status' => 'aktif',
+            ]);
+        }
+
+        $response = $this->actingAs($store->owner)
+            ->get(route('seller.ternak.index', [
+                'q' => 'limousin',
+                'kategori' => $this->category->id,
+                'status' => 'aktif',
+                'page' => 2,
+            ]))
+            ->assertOk()
+            ->assertSeeText('Menampilkan 9-10 dari 10 data ternak')
+            ->assertSeeText('Limousin 9')
+            ->assertSeeText('Limousin 10')
+            ->assertDontSeeText('Limousin 8');
+
+        $response->assertSee('q=limousin', false)
+            ->assertSee('kategori='.$this->category->id, false)
+            ->assertSee('status=aktif', false)
+            ->assertSee('page=1', false);
+    }
+
+    public function test_daftar_ternak_tidak_menampilkan_data_toko_lain(): void
+    {
+        $store = $this->activeStore();
+        $otherStore = $this->activeStore();
+        $this->createIndexedLivestock($store, $this->batchType, ['nama_kode' => 'Ternak milik saya']);
+        $this->createIndexedLivestock($otherStore, $this->batchType, ['nama_kode' => 'Ternak milik toko lain']);
+
+        $this->actingAs($store->owner)
+            ->get(route('seller.ternak.index'))
+            ->assertOk()
+            ->assertSeeText('Ternak milik saya')
+            ->assertDontSeeText('Ternak milik toko lain')
+            ->assertSeeText('Menampilkan 1-1 dari 1 data ternak');
+    }
+
     public function test_form_hanya_menampilkan_kategori_dan_jenis_aktif_dari_group_ternak_hidup(): void
     {
         $store = $this->activeStore();
@@ -335,6 +610,26 @@ class LivestockTest extends TestCase
         unset($attributes['category_id']);
 
         return Livestock::query()->create($attributes);
+    }
+
+    private function createIndexedLivestock(Store $store, CommodityType $type, array $overrides = []): Livestock
+    {
+        return Livestock::query()->create(array_replace([
+            'store_id' => $store->id,
+            'commodity_type_id' => $type->id,
+            'mode' => 'batch',
+            'purpose' => 'pembesaran',
+            'nama_kode' => 'Sapi kelompok A',
+            'ras' => 'Limousin',
+            'jenis_kelamin' => 'jantan',
+            'umur' => 12,
+            'berat' => 150.5,
+            'jumlah' => 3,
+            'harga' => 12500000,
+            'satuan_jual' => 'ekor',
+            'stok' => 3,
+            'status' => 'aktif',
+        ], $overrides));
     }
 
     private function validData(array $overrides = []): array

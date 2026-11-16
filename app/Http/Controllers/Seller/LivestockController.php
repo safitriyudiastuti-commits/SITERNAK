@@ -14,6 +14,7 @@ use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\View\View;
 use RuntimeException;
 use Throwable;
@@ -29,20 +30,61 @@ class LivestockController extends Controller
             ->orderBy('name')
             ->get();
 
-        $livestock = Livestock::query()
-            ->with(['commodityType.category', 'media'])
+        $search = $request->query('q');
+        $search = is_string($search) ? trim($search) : '';
+        $categoryFilter = $request->query('kategori');
+        $statusFilter = $request->query('status');
+        $availableStatuses = ['all', 'aktif', 'nonaktif', 'tersedia', 'dalam_proses', 'terjual'];
+        if (! is_string($statusFilter) || ! in_array($statusFilter, $availableStatuses, true)) {
+            $statusFilter = '';
+        }
+
+        $livestockQuery = Livestock::query()
+            ->with(['commodityType.category', 'media', 'contestHistories'])
             ->where('store_id', $store->id)
-            ->latest()
-            ->get();
+            ->when($search !== '', function ($query) use ($search): void {
+                $term = '%'.mb_strtolower($search).'%';
+                $query->where(function ($query) use ($term): void {
+                    $query->whereRaw('LOWER(nama_kode) LIKE ?', [$term])
+                        ->orWhereRaw('LOWER(ras) LIKE ?', [$term])
+                        ->orWhereHas('commodityType', fn ($typeQuery) => $typeQuery
+                            ->whereRaw('LOWER(name) LIKE ?', [$term]));
+                });
+            })
+            ->when(is_string($statusFilter) && $statusFilter !== '' && $statusFilter !== 'all', function ($query) use ($statusFilter): void {
+                $query->where('status', $statusFilter);
+            })
+            ->when(is_string($categoryFilter) && $categoryFilter !== '' && $categoryFilter !== 'all', function ($query) use ($categoryFilter, $categories): void {
+                $categoryIds = is_numeric($categoryFilter)
+                    ? $categories->where('id', (int) $categoryFilter)->pluck('id')
+                    : $categories
+                        ->filter(fn (CommodityCategory $category): bool => Str::slug($category->name) === $categoryFilter)
+                        ->pluck('id');
+
+                $query->whereIn('commodity_type_id', CommodityType::query()
+                    ->select('id')
+                    ->whereIn('category_id', $categoryIds));
+            })
+            ->latest();
+        $livestock = $livestockQuery->paginate(8)->withQueryString();
 
         $categories->each(function (CommodityCategory $category) use ($livestock): void {
             $category->setRelation(
                 'livestock',
-                $livestock->filter(fn (Livestock $item) => $item->commodityType?->category_id === $category->id)->values()
+                $livestock->getCollection()
+                    ->filter(fn (Livestock $item) => $item->commodityType?->category_id === $category->id)
+                    ->values()
             );
         });
 
-        return view('seller.ternak.index', compact('categories', 'store'));
+        return view('seller.ternak.index', [
+            'categories' => $categories,
+            'livestock' => $livestock,
+            'selectedSearch' => $search,
+            'selectedCategory' => is_string($categoryFilter) ? $categoryFilter : '',
+            'selectedStatus' => is_string($statusFilter) ? $statusFilter : '',
+            'store' => $store,
+        ]);
     }
 
     public function show(Request $request, int $livestock): View
@@ -70,17 +112,49 @@ class LivestockController extends Controller
         if ($attributes['mode'] === 'individual') {
             $attributes['jumlah'] = 1;
         }
+        $contestData = $attributes['contest'] ?? [];
+        unset($attributes['contest']);
 
         $storedPaths = [];
+        $certificatePath = null;
         try {
-            $livestock = DB::transaction(function () use ($store, $attributes, $request, &$storedPaths): Livestock {
+            $livestock = DB::transaction(function () use (
+                $store,
+                $attributes,
+                $contestData,
+                $request,
+                &$storedPaths,
+                &$certificatePath
+            ): Livestock {
                 $livestock = Livestock::query()->create(['store_id' => $store->id] + $attributes);
                 $this->saveMedia($livestock, $request->file('media', []), $storedPaths);
+
+                $certificate = $contestData['certificate'] ?? null;
+                if ($certificate instanceof UploadedFile) {
+                    $certificatePath = $certificate->store(
+                        "livestock-contests/{$store->id}/{$livestock->id}",
+                        'private'
+                    );
+                    if (! $certificatePath) {
+                        throw new RuntimeException('Sertifikat kontes gagal disimpan.');
+                    }
+
+                    unset($contestData['certificate']);
+                    $livestock->contestHistories()->create($contestData + [
+                        'certificate_path' => $certificatePath,
+                        'certificate_original_name' => $certificate->getClientOriginalName(),
+                        'certificate_mime_type' => $certificate->getMimeType() ?? 'application/octet-stream',
+                        'status' => 'pending',
+                    ]);
+                }
 
                 return $livestock;
             });
         } catch (Throwable $exception) {
             $this->deleteMediaFiles($storedPaths);
+            if ($certificatePath !== null) {
+                $this->deleteContestCertificateFiles([$certificatePath]);
+            }
             throw $exception;
         }
 
@@ -105,6 +179,7 @@ class LivestockController extends Controller
         $store = $this->activeStore($request);
         $item = $this->ownedLivestock($store, $livestock);
         $attributes = $this->validatedAttributes($request);
+        unset($attributes['contest']);
 
         if ($attributes['mode'] === 'individual') {
             $attributes['jumlah'] = 1;
@@ -147,14 +222,16 @@ class LivestockController extends Controller
     {
         $store = $this->activeStore($request);
         $item = $this->ownedLivestock($store, $livestock);
-        $paths = DB::transaction(function () use ($item): array {
+        [$paths, $certificatePaths] = DB::transaction(function () use ($item): array {
             $paths = $item->media()->pluck('path')->all();
+            $certificatePaths = $item->contestHistories()->pluck('certificate_path')->all();
             $item->delete();
 
-            return $paths;
+            return [$paths, $certificatePaths];
         });
 
         $this->deleteMediaFiles($paths);
+        $this->deleteContestCertificateFiles($certificatePaths);
 
         return redirect()->route('seller.ternak.index')
             ->with('success', 'Data ternak berhasil dihapus.');
@@ -172,7 +249,7 @@ class LivestockController extends Controller
     private function ownedLivestock(Store $store, int $id): Livestock
     {
         return Livestock::query()
-            ->with(['commodityType.category', 'media'])
+            ->with(['commodityType.category', 'media', 'contestHistories'])
             ->where('store_id', $store->id)
             ->findOrFail($id);
     }
@@ -195,6 +272,7 @@ class LivestockController extends Controller
                 'selling_modes' => $type->selling_modes ?? [],
                 'purposes' => $type->purposes ?? [],
                 'form_fields' => $type->form_fields ?? [],
+                'contest_categories' => $type->contest_categories ?? [],
             ]
         ))->values();
 
@@ -247,6 +325,19 @@ class LivestockController extends Controller
         foreach ($paths as $path) {
             if (! Storage::disk('public')->delete($path)) {
                 throw new RuntimeException("Berkas media {$path} gagal dihapus.");
+            }
+        }
+    }
+
+    /**
+     * @param  array<int, string>  $paths
+     */
+    private function deleteContestCertificateFiles(array $paths): void
+    {
+        foreach ($paths as $path) {
+            $disk = Storage::disk('private');
+            if ($disk->exists($path) && ! $disk->delete($path)) {
+                throw new RuntimeException("Sertifikat kontes {$path} gagal dihapus.");
             }
         }
     }

@@ -4,6 +4,9 @@ namespace App\Http\Controllers\Seller;
 
 use App\Enums\StoreStatus;
 use App\Http\Controllers\Controller;
+use App\Models\Livestock;
+use App\Models\LivestockContestHistory;
+use App\Models\LivestockProduct;
 use App\Models\Store;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -18,7 +21,38 @@ class DashboardController extends Controller
             ->latest('id')
             ->firstOrFail();
 
-        // TODO: ganti data asli
+        $availableLivestock = Livestock::query()
+            ->where('store_id', $store->id)
+            ->where('status', 'aktif')
+            ->where('stok', '>', 0);
+        $availableLivestockCount = (clone $availableLivestock)->count();
+        $availableIndividualCount = (clone $availableLivestock)->where('mode', 'individual')->count();
+        $availableBatchCount = (clone $availableLivestock)->where('mode', 'batch')->count();
+
+        $products = LivestockProduct::query()
+            ->where('store_id', $store->id)
+            ->get();
+        $almostExpiredProducts = $products
+            ->filter(fn (LivestockProduct $product): bool => $product->status === 'hampir_kedaluwarsa')
+            ->values();
+        $lowStockProducts = $products
+            ->filter(fn (LivestockProduct $product): bool => (float) $product->stok <= 10)
+            ->values();
+
+        $lowStockBatchLivestock = Livestock::query()
+            ->where('store_id', $store->id)
+            ->where('mode', 'batch')
+            ->where('status', 'aktif')
+            ->where('stok', '<=', 10)
+            ->with('commodityType')
+            ->get();
+
+        $pendingContestCount = LivestockContestHistory::query()
+            ->where('status', 'pending')
+            ->whereHas('livestock', fn ($query) => $query->where('store_id', $store->id))
+            ->count();
+
+        // TODO: ganti setelah tabel orders ada
         $summary = [
             [
                 'label' => 'Pesanan perlu dikonfirmasi',
@@ -36,20 +70,71 @@ class DashboardController extends Controller
             ],
             [
                 'label' => 'Ternak hidup tersedia',
-                'value' => '34 data',
-                'note' => '18 individu · 16 batch',
+                'value' => "{$availableLivestockCount} data",
+                'note' => "{$availableIndividualCount} individu · {$availableBatchCount} batch",
                 'tone' => 'blue',
-                'icon' => '34',
+                'icon' => (string) $availableLivestockCount,
             ],
             [
                 'label' => 'Produk hampir kedaluwarsa',
-                'value' => '3 produk',
+                'value' => $almostExpiredProducts->count().' produk',
                 'note' => 'Periksa stok dalam 3 hari',
                 'tone' => 'red',
-                'icon' => '!',
+                'icon' => $almostExpiredProducts->count() > 0 ? '!' : '0',
             ],
         ];
 
+        $actions = [];
+        if ($almostExpiredProducts->isNotEmpty()) {
+            $actions[] = [
+                'title' => $almostExpiredProducts->count().' produk kedaluwarsa dalam 3 hari',
+                'description' => $almostExpiredProducts
+                    ->take(2)
+                    ->map(fn (LivestockProduct $product): string => $product->commodityType->name)
+                    ->implode(', '),
+                'action' => 'Periksa',
+                'tone' => 'red',
+                'href' => route('seller.hasil-ternak.index'),
+            ];
+        }
+
+        if ($lowStockBatchLivestock->isNotEmpty()) {
+            $actions[] = [
+                'title' => $lowStockBatchLivestock->count().' ternak batch memiliki stok rendah',
+                'description' => $lowStockBatchLivestock
+                    ->take(2)
+                    ->map(fn (Livestock $livestock): string => $livestock->nama_kode ?: $livestock->commodityType->name)
+                    ->implode(', '),
+                'action' => 'Kelola',
+                'tone' => 'blue',
+                'href' => route('seller.ternak.index'),
+            ];
+        }
+
+        if ($lowStockProducts->isNotEmpty()) {
+            $actions[] = [
+                'title' => $lowStockProducts->count().' produk memiliki stok rendah',
+                'description' => $lowStockProducts
+                    ->take(2)
+                    ->map(fn (LivestockProduct $product): string => $product->commodityType->name)
+                    ->implode(', '),
+                'action' => 'Kelola',
+                'tone' => 'blue',
+                'href' => route('seller.hasil-ternak.index'),
+            ];
+        }
+
+        if ($pendingContestCount > 0) {
+            $actions[] = [
+                'title' => "{$pendingContestCount} sertifikat menunggu verifikasi",
+                'description' => 'Riwayat kontes ternak menunggu verifikasi',
+                'action' => 'Lihat',
+                'tone' => 'green',
+                'href' => route('seller.ternak.index'),
+            ];
+        }
+
+        // TODO: ganti setelah tabel orders ada
         $chart = [
             ['month' => 'Apr', 'amount' => 'Rp 31 jt', 'height' => 46],
             ['month' => 'Mei', 'amount' => 'Rp 42 jt', 'height' => 62],
@@ -59,33 +144,7 @@ class DashboardController extends Controller
             ['month' => 'Sep', 'amount' => 'Rp 48 jt', 'height' => 71],
         ];
 
-        $actions = [
-            [
-                'title' => '5 pesanan menunggu konfirmasi',
-                'description' => 'Tinjau dan siapkan pesanan',
-                'action' => 'Tinjau',
-                'tone' => 'amber',
-            ],
-            [
-                'title' => '3 produk kedaluwarsa dalam 3 hari',
-                'description' => 'Segera periksa stok yang tersedia',
-                'action' => 'Periksa',
-                'tone' => 'red',
-            ],
-            [
-                'title' => 'Stok Ayam Kampung tinggal 12 ekor',
-                'description' => 'Perbarui stok agar tetap akurat',
-                'action' => 'Kelola',
-                'tone' => 'blue',
-            ],
-            [
-                'title' => '1 sertifikat menunggu verifikasi',
-                'description' => 'Lengkapi dokumen ternak',
-                'action' => 'Lihat',
-                'tone' => 'green',
-            ],
-        ];
-
+        // TODO: ganti setelah tabel orders ada
         $orders = [
             [
                 'product' => 'Sapi Limousin Jantan Super',
@@ -140,6 +199,10 @@ class DashboardController extends Controller
             'chart' => $chart,
             'actions' => $actions,
             'orders' => $orders,
+            'almostExpiredProducts' => $almostExpiredProducts,
+            'lowStockBatchLivestock' => $lowStockBatchLivestock,
+            'lowStockProducts' => $lowStockProducts,
+            'pendingContestCount' => $pendingContestCount,
         ]);
     }
 }

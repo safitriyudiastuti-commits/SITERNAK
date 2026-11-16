@@ -10,6 +10,7 @@
     $fieldConfig = $selectedType['form_fields'] ?? [];
     $initialModes = $selectedType['selling_modes'] ?? [];
     $initialPurposes = $selectedType['purposes'] ?? [];
+    $initialContestCategories = $selectedType['contest_categories'] ?? [];
     $initialMode = old('mode', $livestock?->mode);
     if (! in_array($initialMode, $initialModes, true)) {
         $initialMode = $initialModes[0] ?? '';
@@ -26,6 +27,10 @@
     $initialName = old('nama_kode', $livestock?->nama_kode) ?: ($selectedType['name'] ?? 'Nama ternak');
     $initialImage = $livestock?->media->firstWhere('type', 'image');
     $initialUnit = old('satuan_jual', $livestock?->satuan_jual);
+    $contestHistories = $livestock?->contestHistories ?? collect();
+    $initialContestEnabled = ! $livestock
+        && $initialMode === 'individual'
+        && $initialContestCategories !== [];
 @endphp
 <style>
     .livestock-form { --form-green: #2d5a27; }
@@ -364,6 +369,114 @@
                     <p class="text-[10px] text-gray-500">Jika diisi, semua kolom silsilah wajib lengkap.</p>
                 </section>
 
+                <section id="contest-card" class="livestock-form-card space-y-4 {{ $initialContestEnabled ? '' : 'hidden' }}">
+                    <div class="flex items-center justify-between gap-3">
+                        <div class="flex items-center gap-2">
+                            <span class="flex h-6 w-6 items-center justify-center rounded-full bg-[#eef3ea] text-xs font-bold text-[#2d5a27]">5</span>
+                            <h2 class="text-sm font-bold text-gray-900">Riwayat prestasi kontes</h2>
+                        </div>
+                        <span class="rounded-full bg-[#f0f0ec] px-2.5 py-1 text-[10px] font-medium text-gray-600">Opsional</span>
+                    </div>
+
+                    @if ($livestock)
+                        @if ($contestHistories->isNotEmpty())
+                            <div class="space-y-2">
+                                @foreach ($contestHistories as $history)
+                                    @php
+                                        $contestStatusClasses = [
+                                            'pending' => 'bg-[#fff1c9] text-[#a16207]',
+                                            'verified' => 'bg-[#e0f3e7] text-[#247341]',
+                                            'rejected' => 'bg-[#fee2e2] text-[#b91c1c]',
+                                        ];
+                                        $contestStatusLabels = [
+                                            'pending' => 'Menunggu verifikasi',
+                                            'verified' => 'Terverifikasi',
+                                            'rejected' => 'Ditolak',
+                                        ];
+                                    @endphp
+                                    <article class="rounded-lg border border-gray-200 bg-[#fafaf8] p-3">
+                                        <div class="flex flex-wrap items-center justify-between gap-2">
+                                            <span class="text-xs font-semibold text-gray-900">{{ $history->contest_name }}</span>
+                                            <span class="rounded-full px-2.5 py-1 text-[10px] font-medium {{ $contestStatusClasses[$history->status] ?? 'bg-gray-100 text-gray-600' }}">
+                                                {{ $contestStatusLabels[$history->status] ?? ucfirst($history->status) }}
+                                            </span>
+                                        </div>
+                                        <p class="mt-1 text-[10px] text-gray-500">
+                                            {{ $history->category }} · {{ $history->rank }} · {{ $history->contest_date->format('d M Y') }}
+                                        </p>
+                                        @if ($history->status === 'rejected' && $history->rejection_reason)
+                                            <p class="mt-2 text-[10px] text-red-700">Alasan penolakan: {{ $history->rejection_reason }}</p>
+                                        @endif
+                                    </article>
+                                @endforeach
+                            </div>
+                        @else
+                            <p class="text-xs text-gray-500">Belum ada riwayat kontes.</p>
+                        @endif
+                        <a href="{{ route('seller.ternak.show', $livestock->id) }}"
+                           class="inline-flex text-xs font-medium text-[#2d5a27] hover:underline">
+                            Kelola di halaman detail
+                        </a>
+                    @else
+                        <div class="grid gap-3 sm:grid-cols-2">
+                            <label class="livestock-form-label">
+                                Nama kontes <span class="text-red-600">*</span>
+                                <input type="text" name="contest[contest_name]" value="{{ old('contest.contest_name') }}"
+                                       maxlength="150" data-contest-field @disabled(! $initialContestEnabled)
+                                       class="livestock-form-control">
+                                @error('contest.contest_name')<span class="mt-1 block text-xs text-red-600">{{ $message }}</span>@enderror
+                            </label>
+                            <label class="livestock-form-label">
+                                Kategori <span class="text-red-600">*</span>
+                                <span class="livestock-select-wrap block">
+                                    <select name="contest[category]" id="contest-category" data-contest-field
+                                            @disabled(! $initialContestEnabled) class="livestock-form-control">
+                                        <option value="">Pilih kategori</option>
+                                        @foreach ($initialContestCategories as $contestCategory)
+                                            <option value="{{ $contestCategory }}" @selected(old('contest.category') === $contestCategory)>
+                                                {{ $contestCategory }}
+                                            </option>
+                                        @endforeach
+                                    </select>
+                                    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" class="livestock-select-chevron">
+                                        <path d="m7 10 5 5 5-5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+                                    </svg>
+                                </span>
+                                @error('contest.category')<span class="mt-1 block text-xs text-red-600">{{ $message }}</span>@enderror
+                            </label>
+                            <label class="livestock-form-label">
+                                Peringkat <span class="text-red-600">*</span>
+                                <input type="text" name="contest[rank]" value="{{ old('contest.rank') }}"
+                                       maxlength="100" data-contest-field @disabled(! $initialContestEnabled)
+                                       class="livestock-form-control">
+                                @error('contest.rank')<span class="mt-1 block text-xs text-red-600">{{ $message }}</span>@enderror
+                            </label>
+                            <label class="livestock-form-label">
+                                Tanggal <span class="text-red-600">*</span>
+                                <input type="date" name="contest[contest_date]" value="{{ old('contest.contest_date') }}"
+                                       data-contest-field @disabled(! $initialContestEnabled)
+                                       class="livestock-form-control">
+                                @error('contest.contest_date')<span class="mt-1 block text-xs text-red-600">{{ $message }}</span>@enderror
+                            </label>
+                            <label class="livestock-form-label sm:col-span-2">
+                                Penyelenggara <span class="text-red-600">*</span>
+                                <input type="text" name="contest[organizer]" value="{{ old('contest.organizer') }}"
+                                       maxlength="150" data-contest-field @disabled(! $initialContestEnabled)
+                                       class="livestock-form-control">
+                                @error('contest.organizer')<span class="mt-1 block text-xs text-red-600">{{ $message }}</span>@enderror
+                            </label>
+                            <label class="livestock-form-label sm:col-span-2">
+                                Sertifikat (JPG, PNG, atau PDF; maksimal 5 MB) <span class="text-red-600">*</span>
+                                <input type="file" name="contest[certificate]"
+                                       accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf"
+                                       data-contest-field @disabled(! $initialContestEnabled)
+                                       class="livestock-form-control">
+                                @error('contest.certificate')<span class="mt-1 block text-xs text-red-600">{{ $message }}</span>@enderror
+                            </label>
+                        </div>
+                    @endif
+                </section>
+
                 <div class="flex flex-col-reverse justify-end gap-2 sm:flex-row">
                     <a href="{{ route('seller.ternak.index') }}"
                        class="rounded-lg border border-gray-200 bg-white px-5 py-2.5 text-center text-sm font-medium text-gray-700 hover:bg-gray-50">
@@ -440,12 +553,16 @@
         const quantityInput = document.getElementById('jumlah');
         const pedigreeCard = document.getElementById('pedigree-card');
         const pedigreeFields = [...document.querySelectorAll('[data-pedigree-field]')];
+        const contestCard = document.getElementById('contest-card');
+        const contestFields = [...document.querySelectorAll('[data-contest-field]')];
+        const contestCategorySelect = document.getElementById('contest-category');
         const types = @json($types);
         const modeLabels = @json($modeLabels);
         const purposeLabels = @json($purposeLabels);
         const selectedTypeId = @json((string) $selectedTypeId);
         const previousMode = @json(old('mode', $livestock?->mode));
         const previousPurpose = @json(old('purpose', $livestock?->purpose));
+        const previousContestCategory = @json(old('contest.category'));
         const fieldKeys = {
             nama_kode: 'nama_kode',
             ras: 'ras',
@@ -455,30 +572,44 @@
         };
 
         function updatePreview() {
+            const title = document.getElementById('preview-title');
+            const modePreview = document.getElementById('preview-mode');
+            const purposePreview = document.getElementById('preview-purpose');
+            const pricePreview = document.getElementById('preview-price');
+            const unitPreview = document.getElementById('preview-unit');
+            const statusPreview = document.getElementById('preview-status');
+            const nameInput = document.getElementById('nama_kode');
+            const genderSelect = document.getElementById('jenis_kelamin');
+            const priceInput = document.getElementById('harga');
+            const unitSelect = document.getElementById('satuan_jual');
+            const statusSelect = document.getElementById('status');
+            if (!typeSelect || !modeSelect || !nameInput || !genderSelect || !priceInput || !unitSelect || !statusSelect) return;
+
             const type = types.find((item) => String(item.id) === typeSelect.value);
-            const name = document.getElementById('nama_kode').value.trim() || type?.name || 'Nama ternak';
-            const gender = document.getElementById('jenis_kelamin').selectedOptions[0]?.textContent.trim();
+            const name = nameInput.value.trim() || type?.name || 'Nama ternak';
+            const gender = genderSelect.selectedOptions[0]?.textContent.trim();
             const selectedPurpose = document.querySelector('input[name="purpose"]:checked')?.value ?? '';
             const purpose = selectedPurpose ? purposeLabels[selectedPurpose] : '';
             const suffix = [gender && gender !== 'Pilih jenis kelamin' ? gender : '', purpose].filter(Boolean).join(' – ');
-            document.getElementById('preview-title').textContent = suffix ? `${name} – ${suffix}` : name;
-            document.getElementById('preview-mode').textContent = modeLabels[modeSelect.value] ?? 'Mode ternak';
-            document.getElementById('preview-purpose').textContent = purpose || 'Pilih peruntukan';
-            const price = document.getElementById('harga').value;
-            document.getElementById('preview-price').textContent = price
+            if (title) title.textContent = suffix ? `${name} – ${suffix}` : name;
+            if (modePreview) modePreview.textContent = modeLabels[modeSelect.value] ?? 'Mode ternak';
+            if (purposePreview) purposePreview.textContent = purpose || 'Pilih peruntukan';
+            const price = priceInput.value;
+            if (pricePreview) pricePreview.textContent = price
                 ? `Rp ${Number(price).toLocaleString('id-ID')}`
                 : 'Rp 0';
-            document.getElementById('preview-unit').textContent = document.getElementById('satuan_jual').value || 'ekor';
-            document.getElementById('preview-status').textContent =
-                document.getElementById('status').value === 'aktif' ? 'Tersedia' : 'Nonaktif';
+            if (unitPreview) unitPreview.textContent = unitSelect.value || 'ekor';
+            if (statusPreview) statusPreview.textContent = statusSelect.value === 'aktif' ? 'Tersedia' : 'Nonaktif';
         }
 
         function updatePurposeOptions(purposes, preserveSelection) {
             const field = document.getElementById('purpose-field');
             const options = document.getElementById('purpose-options');
+            const requiredMarker = document.getElementById('purpose-required-marker');
+            if (!field || !options) return;
             const chosen = preserveSelection && purposes.includes(previousPurpose) ? previousPurpose : '';
             field.classList.toggle('hidden', purposes.length === 0);
-            document.getElementById('purpose-required-marker').classList.toggle('hidden', purposes.length === 0);
+            requiredMarker?.classList.toggle('hidden', purposes.length === 0);
             options.replaceChildren();
             purposes.forEach((value) => {
                 const label = document.createElement('label');
@@ -500,7 +631,32 @@
             updatePreview();
         }
 
-        function updateModeFields() {
+        function updateContestFields(type, preserveSelection = false) {
+            if (!contestCard) return;
+
+            const contestCategories = type?.contest_categories ?? [];
+            const available = modeSelect?.value === 'individual' && contestCategories.length > 0;
+            contestCard.classList.toggle('hidden', !available);
+            contestFields.forEach((field) => {
+                if (field) field.disabled = !available;
+            });
+
+            if (!contestCategorySelect) return;
+
+            const currentCategory = contestCategorySelect.value;
+            const chosenCategory = contestCategories.includes(currentCategory)
+                ? currentCategory
+                : preserveSelection && contestCategories.includes(previousContestCategory)
+                    ? previousContestCategory
+                    : '';
+            contestCategorySelect.replaceChildren(new Option('Pilih kategori', ''));
+            contestCategories.forEach((category) => {
+                contestCategorySelect.add(new Option(category, category, false, category === chosenCategory));
+            });
+        }
+
+        function updateModeFields(preserveContestSelection = false) {
+            if (!modeSelect || !categorySelect || !typeSelect) return;
             const selectedMode = modeSelect.value;
             const isBatch = selectedMode === 'batch';
             const type = types.find((item) =>
@@ -508,13 +664,16 @@
             );
             const field = document.getElementById('jumlah-field');
             const input = document.getElementById('jumlah');
-            field.classList.toggle('hidden', !isBatch);
-            input.required = isBatch;
-            if (!isBatch) input.value = '';
-            stockInput.value = isBatch ? input.value : '1';
-            modeNote.classList.toggle('hidden', !type);
+            field?.classList.toggle('hidden', !isBatch);
+            if (input) {
+                input.required = isBatch;
+                if (!isBatch) input.value = '';
+            }
+            if (stockInput) stockInput.value = isBatch ? input?.value ?? '' : '1';
+            modeNote?.classList.toggle('hidden', !type);
             document.getElementById('mode-error')?.classList.toggle('hidden', Boolean(type));
-            document.getElementById('mode-note-text').textContent = selectedMode === 'individual'
+            const modeNoteText = document.getElementById('mode-note-text');
+            if (modeNoteText) modeNoteText.textContent = selectedMode === 'individual'
                 ? 'Mode pencatatan: Individual. Satu data mewakili satu ekor ternak.'
                 : selectedMode === 'batch'
                     ? 'Mode pencatatan: Batch. Masukkan jumlah ternak dalam kelompok ini.'
@@ -525,10 +684,12 @@
                 button.setAttribute('aria-pressed', selected ? 'true' : 'false');
             });
             updatePedigreeFields();
+            updateContestFields(type, preserveContestSelection);
             updatePreview();
         }
 
         function updatePedigreeFields() {
+            if (!modeSelect || !pedigreeCard) return;
             const isIndividual = modeSelect.value === 'individual';
             const hasPedigreeValue = pedigreeFields.some((field) => field.value.trim() !== '');
             pedigreeCard.classList.toggle('hidden', !isIndividual);
@@ -539,6 +700,7 @@
         }
 
         function updateTypeFields(preserveSelection = false) {
+            if (!typeSelect || !modeSelect) return;
             const type = types.find((item) => String(item.id) === typeSelect.value);
             const fields = type?.form_fields ?? {};
 
@@ -566,8 +728,8 @@
                     : (type?.selling_modes[0] ?? '');
             modeSelect.value = chosenMode;
             const modeOptions = document.getElementById('mode-options');
-            modeOptions.replaceChildren();
-            modeOptions.classList.toggle('hidden', (type?.selling_modes.length ?? 0) !== 2);
+            modeOptions?.replaceChildren();
+            modeOptions?.classList.toggle('hidden', (type?.selling_modes.length ?? 0) !== 2);
             (type?.selling_modes ?? []).forEach((mode) => {
                 const button = document.createElement('button');
                 button.type = 'button';
@@ -575,14 +737,15 @@
                 button.className = `livestock-mode-option rounded-full border border-[#cbd8c5] bg-white px-3 py-1 text-[10px] font-medium text-[#456541] hover:border-[#2d5a27]${mode === chosenMode ? ' is-selected' : ''}`;
                 button.setAttribute('aria-pressed', mode === chosenMode ? 'true' : 'false');
                 button.textContent = modeLabels[mode] ?? mode;
-                modeOptions.append(button);
+                modeOptions?.append(button);
             });
-            updateModeFields();
+            updateModeFields(preserveSelection);
             updatePurposeOptions(type?.purposes ?? [], preserveSelection);
             updatePreview();
         }
 
         function updateTypes(preserveSelection = false) {
+            if (!categorySelect || !typeSelect) return;
             const categoryId = categorySelect.value;
             const availableTypes = types.filter((item) => String(item.category_id) === categoryId);
             typeSelect.replaceChildren(new Option('Pilih jenis', ''));
@@ -596,8 +759,9 @@
         }
 
         const mediaInput = document.getElementById('media');
-        mediaInput.addEventListener('change', () => {
+        mediaInput?.addEventListener('change', () => {
             const preview = document.getElementById('new-media-preview');
+            if (!preview || !mediaInput) return;
             preview.replaceChildren();
             [...mediaInput.files].slice(0, 5).forEach((file) => {
                 const tile = document.createElement('div');
@@ -619,36 +783,39 @@
             const firstImage = [...mediaInput.files].find((file) => file.type.startsWith('image/'));
             if (firstImage) {
                 const image = document.getElementById('preview-image');
-                image.src = URL.createObjectURL(firstImage);
-                image.classList.remove('hidden');
+                if (image) {
+                    image.src = URL.createObjectURL(firstImage);
+                    image.classList.remove('hidden');
+                }
                 document.getElementById('preview-placeholder')?.classList.add('hidden');
             }
         });
 
-        categorySelect.addEventListener('change', () => updateTypes(false));
-        typeSelect.addEventListener('change', () => updateTypeFields(false));
-        document.getElementById('mode-options').addEventListener('click', (event) => {
-            const button = event.target.closest('[data-mode-option]');
+        categorySelect?.addEventListener('change', () => updateTypes(false));
+        typeSelect?.addEventListener('change', () => updateTypeFields(false));
+        document.getElementById('mode-options')?.addEventListener('click', (event) => {
+            const button = event.target instanceof Element ? event.target.closest('[data-mode-option]') : null;
             if (!button) return;
+            if (!modeSelect) return;
             modeSelect.value = button.dataset.modeOption;
             updateModeFields();
         });
-        document.getElementById('purpose-options').addEventListener('change', (event) => {
-            if (!event.target.matches('input[name="purpose"]')) return;
+        document.getElementById('purpose-options')?.addEventListener('change', (event) => {
+            if (!(event.target instanceof HTMLInputElement) || !event.target.matches('input[name="purpose"]')) return;
             updatePreview();
         });
-        quantityInput.addEventListener('input', () => {
-            if (modeSelect.value === 'batch') stockInput.value = quantityInput.value;
+        quantityInput?.addEventListener('input', () => {
+            if (modeSelect?.value === 'batch' && stockInput) stockInput.value = quantityInput.value;
         });
         pedigreeFields.forEach((field) => {
-            field.addEventListener('input', updatePedigreeFields);
+            field?.addEventListener('input', updatePedigreeFields);
         });
-        document.getElementById('livestock-form').addEventListener('submit', () => {
-            stockInput.value = modeSelect.value === 'batch' ? quantityInput.value : '1';
+        document.getElementById('livestock-form')?.addEventListener('submit', () => {
+            if (stockInput && modeSelect) stockInput.value = modeSelect.value === 'batch' ? quantityInput?.value ?? '' : '1';
         });
         ['nama_kode', 'jenis_kelamin', 'harga', 'satuan_jual', 'status'].forEach((id) => {
-            document.getElementById(id).addEventListener('input', updatePreview);
-            document.getElementById(id).addEventListener('change', updatePreview);
+            document.getElementById(id)?.addEventListener('input', updatePreview);
+            document.getElementById(id)?.addEventListener('change', updatePreview);
         });
         updateTypes(true);
         updatePreview();
