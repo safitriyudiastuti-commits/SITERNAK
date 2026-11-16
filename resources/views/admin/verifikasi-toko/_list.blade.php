@@ -5,8 +5,8 @@
            class="list-item {{ $isSelected ? 'is-active' : '' }}">
             <span class="avatar">{{ $item->owner_initials }}</span>
             <span class="list-main">
-                <strong>{{ $item->owner?->name ?? '-' }}</strong>
-                <small>{{ $item->city }}, {{ $item->province }}</small>
+                <strong>{{ $item->name }}</strong>
+                <small>{{ $item->owner?->name ?? '-' }} · {{ $item->city }}, {{ $item->province }}</small>
             </span>
             <span class="list-side">
                 @if ($item->status === \App\Enums\StoreStatus::PendingVerification)

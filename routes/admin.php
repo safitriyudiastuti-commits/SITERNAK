@@ -3,6 +3,8 @@
 use App\Http\Controllers\Admin\StoreVerificationController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Admin\PaymentVerificationController;
+use App\Http\Controllers\Admin\CommodityTypeController;
+use App\Http\Controllers\Admin\CertificateVerificationController;
 
 /*
 |--------------------------------------------------------------------------
@@ -30,6 +32,23 @@ Route::middleware(['auth', 'role:admin'])->prefix('admin')->name('admin.')->grou
         Route::get('/{payment}', [PaymentVerificationController::class, 'show'])->name('show');
         Route::post('/{payment}/keputusan', [PaymentVerificationController::class, 'verify'])->name('verify');
         Route::get('/{payment}/bukti', [PaymentVerificationController::class, 'bukti'])->name('bukti');
+    });
+        
+    // UC-20 Verifikasi sertifikat kontes
+    Route::prefix('verifikasi-sertifikat')->name('verifikasi-sertifikat.')->group(function () {
+        Route::get('/', [CertificateVerificationController::class, 'index'])->name('index');
+        Route::get('/{certificate}', [CertificateVerificationController::class, 'show'])->name('show');
+        Route::post('/{certificate}/keputusan', [CertificateVerificationController::class, 'verify'])->name('verify');
+        Route::get('/{certificate}/berkas', [CertificateVerificationController::class, 'berkas'])->name('berkas');
+    });
+
+        // UC-21 Data induk komoditas
+    Route::prefix('data-induk')->name('data-induk.')->group(function () {
+        Route::get('/', [CommodityTypeController::class, 'index'])->name('index');
+        Route::post('/', [CommodityTypeController::class, 'store'])->name('store');
+        Route::get('/{type}', [CommodityTypeController::class, 'show'])->name('show');
+        Route::put('/{type}', [CommodityTypeController::class, 'update'])->name('update');
+        Route::post('/{type}/status', [CommodityTypeController::class, 'toggle'])->name('toggle');
     });
 });
 
