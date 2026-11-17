@@ -4,6 +4,7 @@ use App\Http\Controllers\Seller\ContestHistoryController;
 use App\Http\Controllers\Seller\DashboardController;
 use App\Http\Controllers\Seller\LivestockController;
 use App\Http\Controllers\Seller\LivestockProductController;
+use App\Http\Controllers\Seller\OrderController;
 use App\Http\Controllers\Seller\StoreApplicationController;
 use App\Http\Controllers\Seller\StoreProfileController;
 use App\Http\Controllers\Seller\StoreVerificationController;
@@ -17,6 +18,11 @@ Route::middleware('auth')->prefix('seller')->name('seller.')->group(function () 
 
     // Hanya untuk peternak yang sudah disetujui
     Route::middleware('seller.active')->group(function () {
+        Route::get('pesanan', [OrderController::class, 'index'])->name('pesanan.index');
+        Route::get('pesanan/{order}', [OrderController::class, 'show'])->whereNumber('order')->name('pesanan.show');
+        Route::post('pesanan/{order}/confirm', [OrderController::class, 'confirm'])->whereNumber('order')->name('pesanan.confirm');
+        Route::post('pesanan/{order}/reject', [OrderController::class, 'reject'])->whereNumber('order')->name('pesanan.reject');
+
         Route::get('hasil-ternak', [LivestockProductController::class, 'index'])->name('hasil-ternak.index');
         Route::get('hasil-ternak/create', [LivestockProductController::class, 'create'])->name('hasil-ternak.create');
         Route::post('hasil-ternak', [LivestockProductController::class, 'store'])->name('hasil-ternak.store');
