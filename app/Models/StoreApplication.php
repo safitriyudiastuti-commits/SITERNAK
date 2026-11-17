@@ -1,4 +1,4 @@
-Get-ChildItem database/migrations | Select-Object -ExpandProperty Name<?php
+<?php
 
 namespace App\Models;
 
