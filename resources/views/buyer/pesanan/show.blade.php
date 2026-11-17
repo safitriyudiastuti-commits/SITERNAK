@@ -47,6 +47,35 @@
         </h2>
     </div>
 
+    {{-- Alasan Penolakan --}}
+    @if ($pesanan->status === 'ditolak')
+        <div class="mb-6 rounded-2xl border border-red-200 bg-red-50 p-6">
+            <h2 class="font-bold text-red-800">
+                Pesanan Ditolak
+            </h2>
+
+            <p class="mt-2 text-sm text-red-700">
+                Mohon maaf, pesanan kamu tidak dapat diproses oleh peternak.
+            </p>
+
+            @if ($pesanan->alasan_penolakan)
+                <div class="mt-4 rounded-xl bg-white p-4">
+                    <p class="text-sm font-semibold text-slate-700">
+                        Alasan penolakan:
+                    </p>
+
+                    <p class="mt-2 text-sm text-slate-600">
+                        {{ $pesanan->alasan_penolakan }}
+                    </p>
+                </div>
+            @else
+                <p class="mt-3 text-sm text-red-600">
+                    Peternak belum memberikan alasan penolakan.
+                </p>
+            @endif
+        </div>
+    @endif
+
     {{-- Timeline --}}
     <div class="mb-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
         <h2 class="mb-6 text-lg font-bold text-slate-800">

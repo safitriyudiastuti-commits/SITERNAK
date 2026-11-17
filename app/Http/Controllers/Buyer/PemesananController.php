@@ -7,6 +7,7 @@ use App\Models\Order;
 use App\Models\OrderStatusHistory;
 use App\Models\Livestock;
 use App\Support\SumberKatalog;
+use App\Enums\StoreStatus;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -69,7 +70,10 @@ class PemesananController extends Controller
         $r = SumberKatalog::cari($data['tipe'], (int) $data['item']);
 
         if (! $r) {
-            return back()->withInput()->with('error', 'Barang ini sudah tidak tersedia.');
+            return back()->withInput()->with(
+                'error',
+                'Barang ini sudah tidak tersedia.'
+            );
         }
 
         $livestock = $this->ambilLivestockAsli($r);
@@ -93,7 +97,7 @@ class PemesananController extends Controller
 
         $store = $livestock->store;
 
-        if (! $store || $store->status !== 'verified') {
+        if (! $store || $store->status !== StoreStatus::Active) {
             return back()->withInput()->with(
                 'error',
                 'Toko peternak belum terverifikasi atau tidak tersedia.'

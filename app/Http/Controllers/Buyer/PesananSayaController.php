@@ -18,9 +18,11 @@ class PesananSayaController extends Controller
     {
         $statusValid = [
             'menunggu_konfirmasi',
+            'dikonfirmasi',
             'diproses',
             'dikirim',
             'selesai',
+            'ditolak',
             'dibatalkan',
         ];
 

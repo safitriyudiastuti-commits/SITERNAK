@@ -28,6 +28,7 @@ class Order extends Model
         'provinsi_penerima',
         'diterima_at',
         'catatan',
+        'alasan_penolakan',
     ];
 
     protected $casts = [
