@@ -6,6 +6,7 @@ use App\Http\Controllers\Seller\LivestockController;
 use App\Http\Controllers\Seller\LivestockProductController;
 use App\Http\Controllers\Seller\StoreApplicationController;
 use App\Http\Controllers\Seller\StoreProfileController;
+use App\Http\Controllers\Seller\StoreVerificationController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware('auth')->prefix('seller')->name('seller.')->group(function () {
@@ -40,6 +41,9 @@ Route::middleware('auth')->prefix('seller')->name('seller.')->group(function () 
         Route::put('toko/profil', [StoreProfileController::class, 'update'])->name('toko.profil.update');
         Route::get('toko/libur', [StoreProfileController::class, 'libur'])->name('toko.libur');
         Route::put('toko/libur', [StoreProfileController::class, 'updateLibur'])->name('toko.libur.update');
+        Route::get('toko/verifikasi', [StoreVerificationController::class, 'show'])->name('toko.verifikasi');
+        Route::get('toko/verifikasi/dokumen/{document}', [StoreVerificationController::class, 'document'])
+            ->name('toko.verifikasi.dokumen');
 
     });
 });
