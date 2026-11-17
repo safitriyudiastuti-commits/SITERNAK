@@ -101,7 +101,7 @@
             'title' => 'KINERJA',
             'items' => [
                 ['label' => 'Performa Toko', 'href' => '#', 'icon' => 'M4 19V5M4 19h17M8 15l4-4 3 2 5-6'],
-                ['label' => 'Penilaian Toko', 'href' => '#', 'icon' => 'm12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2-5.6-3-5.6 3 1.1-6.2L3 9.6l6.2-.9z'],
+                ['label' => 'Penilaian Toko', 'href' => route('seller.penilaian.index'), 'route' => 'seller.penilaian.*', 'icon' => 'm12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2-5.6-3-5.6 3 1.1-6.2L3 9.6l6.2-.9z'],
                 ['label' => 'Feedback', 'href' => '#', 'icon' => 'M4 5h16v12H9l-5 4zM8 9h8M8 13h5'],
             ],
         ],

@@ -196,16 +196,102 @@
     @endif
 
     {{-- Ulasan --}}
+    @php($ulasan = $pesanan->review)
     @if ($pesanan->status === 'selesai')
-        <div class="rounded-2xl border border-blue-200 bg-blue-50 p-6">
-            <h2 class="font-bold text-blue-800">
-                Pesanan telah selesai
-            </h2>
+        <section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            @if (session('success'))
+                <div role="status" class="mb-4 rounded-xl border border-green-200 bg-green-50 p-3 text-sm text-green-800">
+                    {{ session('success') }}
+                </div>
+            @endif
 
-            <p class="mt-2 text-sm text-blue-700">
-                Terima kasih telah berbelanja. Anda dapat memberikan ulasan setelah pesanan selesai.
-            </p>
-        </div>
+            @if ($errors->any())
+                <div role="alert" class="mb-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                    <ul class="list-disc space-y-1 pl-5">
+                        @foreach ($errors->all() as $error)
+                            <li>{{ $error }}</li>
+                        @endforeach
+                    </ul>
+                </div>
+            @endif
+
+            @if ((int) auth()->id() === (int) $pesanan->buyer_id && $ulasan)
+                <h2 class="font-bold text-slate-800">Ulasan Anda</h2>
+                <div class="mt-3 flex items-center gap-1 text-amber-500" aria-label="Rating {{ $ulasan->rating }} dari 5">
+                    @for ($bintang = 1; $bintang <= 5; $bintang++)
+                        <span aria-hidden="true">{{ $bintang <= $ulasan->rating ? '★' : '☆' }}</span>
+                    @endfor
+                    <span class="ml-2 text-sm font-semibold text-slate-700">{{ $ulasan->rating }}/5</span>
+                </div>
+
+                @if ($ulasan->komentar)
+                    <p class="mt-3 whitespace-pre-line text-sm text-slate-600">{{ $ulasan->komentar }}</p>
+                @endif
+
+                @if ($ulasan->foto_path)
+                    <a href="{{ Storage::disk('public')->url($ulasan->foto_path) }}" target="_blank" rel="noopener noreferrer"
+                       class="mt-4 inline-block">
+                        <img src="{{ Storage::disk('public')->url($ulasan->foto_path) }}" alt="Foto ulasan pesanan"
+                             class="max-h-64 rounded-xl border border-slate-200 object-cover">
+                    </a>
+                @endif
+
+                @if ($ulasan->balasan)
+                    <div class="mt-5 rounded-xl border border-green-200 bg-green-50 p-4">
+                        <p class="font-semibold text-green-900">Balasan dari toko</p>
+                        <p class="mt-2 whitespace-pre-line text-sm text-green-800">{{ $ulasan->balasan }}</p>
+                        <p class="mt-2 text-xs text-green-700">{{ $ulasan->dibalas_at?->format('d M Y, H:i') }}</p>
+                    </div>
+                @endif
+            @elseif ((int) auth()->id() === (int) $pesanan->buyer_id)
+                <h2 class="font-bold text-slate-800">Bagaimana pengalaman Anda?</h2>
+                <p class="mt-1 text-sm text-slate-500">Bagikan penilaian untuk pesanan ini kepada pembeli lain.</p>
+
+                <form action="{{ route('buyer.ulasan.store', $pesanan->id) }}" method="POST" enctype="multipart/form-data" class="mt-5 space-y-4">
+                    @csrf
+                    <fieldset>
+                        <legend class="mb-2 text-sm font-medium text-slate-700">Rating <span class="text-red-600">*</span></legend>
+                        <div class="flex flex-row-reverse justify-end gap-1">
+                            @for ($bintang = 5; $bintang >= 1; $bintang--)
+                                <label class="cursor-pointer text-3xl leading-none text-slate-300 has-[:checked]:text-amber-400">
+                                    <input type="radio" name="rating" value="{{ $bintang }}" required
+                                           @checked((string) old('rating') === (string) $bintang)
+                                           class="peer sr-only">
+                                    <span aria-hidden="true" class="peer-checked:text-amber-400 hover:text-amber-300">★</span>
+                                    <span class="sr-only">{{ $bintang }} bintang</span>
+                                </label>
+                            @endfor
+                        </div>
+                        @error('rating')
+                            <p class="mt-1 text-sm text-red-700">{{ $message }}</p>
+                        @enderror
+                    </fieldset>
+
+                    <div>
+                        <label for="komentar-ulasan" class="mb-1 block text-sm font-medium text-slate-700">Komentar (opsional)</label>
+                        <textarea id="komentar-ulasan" name="komentar" rows="4" maxlength="1000"
+                                  class="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-800 focus:border-green-600 focus:outline-none focus:ring-2 focus:ring-green-100">{{ old('komentar') }}</textarea>
+                        @error('komentar')
+                            <p class="mt-1 text-sm text-red-700">{{ $message }}</p>
+                        @enderror
+                    </div>
+
+                    <div>
+                        <label for="foto-ulasan" class="mb-1 block text-sm font-medium text-slate-700">Foto (opsional)</label>
+                        <input id="foto-ulasan" type="file" name="foto" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
+                               class="block w-full text-sm text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-slate-100 file:px-3 file:py-2 file:text-sm file:font-medium file:text-slate-700 hover:file:bg-slate-200">
+                        <p class="mt-1 text-xs text-slate-500">JPG, PNG, atau WEBP; maksimal 5 MB.</p>
+                        @error('foto')
+                            <p class="mt-1 text-sm text-red-700">{{ $message }}</p>
+                        @enderror
+                    </div>
+
+                    <button type="submit" class="rounded-xl bg-green-700 px-5 py-3 text-sm font-semibold text-white hover:bg-green-800">
+                        Kirim Ulasan
+                    </button>
+                </form>
+            @endif
+        </section>
     @endif
 
 </div>
