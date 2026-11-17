@@ -13,6 +13,7 @@ class Order extends Model
         'buyer_id',
         'store_id',
         'livestock_id',
+        'livestock_product_id',
         'nama_item',
         'tipe_item',
         'jumlah',
@@ -20,6 +21,7 @@ class Order extends Model
         'harga_satuan',
         'total_harga',
         'metode_bayar',
+        'status_bayar',
         'status',
         'nama_penerima',
         'no_hp_penerima',
@@ -51,6 +53,11 @@ class Order extends Model
     public function livestock(): BelongsTo
     {
         return $this->belongsTo(Livestock::class);
+    }
+
+    public function livestockProduct(): BelongsTo
+    {
+        return $this->belongsTo(LivestockProduct::class);
     }
 
     public function statusHistories(): HasMany
