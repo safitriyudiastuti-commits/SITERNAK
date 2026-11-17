@@ -51,3 +51,21 @@ Route::middleware('auth')
         Route::post('/', [PemesananController::class, 'store'])
             ->name('store');
     });
+
+    // Buyer: pesanan saya dan pelacakan pesanan.
+Route::middleware('auth')
+    ->prefix('pesanan')
+    ->name('buyer.pesanan.')
+    ->controller(\App\Http\Controllers\Buyer\PesananSayaController::class)
+    ->group(function () {
+        Route::get('/', 'index')
+            ->name('index');
+
+        Route::get('/{id}', 'show')
+            ->whereNumber('id')
+            ->name('show');
+
+        Route::post('/{id}/konfirmasi-diterima', 'konfirmasiDiterima')
+            ->whereNumber('id')
+            ->name('konfirmasi');
+    });
