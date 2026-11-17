@@ -56,6 +56,11 @@ class Store extends Model
         return $this->hasMany(StoreDocument::class);
     }
 
+    public function reviews(): HasMany
+    {
+        return $this->hasMany(Review::class);
+    }
+
     public function isOnVacation(): bool
     {
         return $this->vacation_mode
