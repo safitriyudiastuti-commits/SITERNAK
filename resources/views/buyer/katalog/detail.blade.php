@@ -204,7 +204,8 @@ $urlPesan = $ke('buyer.pemesanan.create', [    'tipe' => $r->tipe,
         </p>
 
         {{-- Peternak --}}
-        <div class="mt-3 flex h-[4.75rem] items-center rounded-[0.875rem] border border-[#E4E4DC] bg-white px-4">
+        <a href="{{ route('buyer.toko.show', $r->penjual_id) }}"
+                class="mt-3 flex h-[4.75rem] items-center rounded-[0.875rem] border border-[#E4E4DC] bg-white px-4 transition hover:border-[#2E5B2A] focus:outline-none focus:ring-2 focus:ring-[#2E5B2A]">
             <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#D5E4CF] text-[1.045rem] font-bold text-[#2E5B2A]">
                 {{ \Illuminate\Support\Str::upper(\Illuminate\Support\Str::substr($r->penjual, 0, 2)) }}
             </span>
@@ -224,7 +225,7 @@ $urlPesan = $ke('buyer.pemesanan.create', [    'tipe' => $r->tipe,
                 <x-ikon nama="shield" class="h-[0.6875rem] w-[0.6875rem]" sw="2.4" />
                 Terverifikasi
             </span>
-        </div>
+        </a>
 
         {{-- Data fisik / informasi --}}
         <section class="mt-4 min-h-[12.375rem] rounded-[0.875rem] border border-[#E4E4DC] bg-white p-5">

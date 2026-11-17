@@ -7,6 +7,7 @@ use Illuminate\Database\QueryException;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use App\Support\SumberKatalog;
 
 /**
  * Beranda pembeli dan halaman "Cara Memesan".
@@ -27,9 +28,11 @@ class HomeController extends Controller
 
     public function index()
     {
+        [$semua] = SumberKatalog::semua();
+
         return view('buyer.beranda.index', [
             'kategori'    => self::KATEGORI,
-            'rekomendasi' => $this->rekomendasi(),
+            'rekomendasi' => $semua->sortByDesc('created_at')->take(8)->values(),
         ]);
     }
 
@@ -38,70 +41,4 @@ class HomeController extends Controller
         return view('buyer.beranda.cara-memesan');
     }
 
-    /** 8 ternak/produk terbaru yang layak tampil (aturan sama dengan katalog). */
-    private function rekomendasi(): Collection
-    {
-        try {
-            return collect(['individual', 'batch', 'produk'])
-                ->flatMap(fn (string $tipe) => $this->ambil($tipe, 8))
-                ->sortByDesc('created_at')
-                ->take(8)
-                ->values();
-        } catch (QueryException $e) {
-            // Nama tabel/kolom tim peternak bisa berbeda: jangan merusak beranda.
-            report($e);
-
-            return collect();
-        }
-    }
-
-    private function ambil(string $tipe, int $batas): Collection
-    {
-        $tabel = ['individual' => 'livestocks', 'batch' => 'livestock_batches', 'produk' => 'products'][$tipe];
-
-        if (! Schema::hasTable($tabel) || ! Schema::hasTable('peternaks')) {
-            return collect();
-        }
-
-        $prestasi = Schema::hasTable('contest_histories')
-            ? "EXISTS (SELECT 1 FROM contest_histories ch WHERE ch.livestock_id = t.id AND ch.status_verifikasi = 'terverifikasi')"
-            : '0';
-
-        $q = DB::table("$tabel as t")
-            ->join('peternaks as p', 'p.id', '=', 't.peternak_id')
-            ->where('p.status_verifikasi', 'active');
-
-        // harga, satuan, stok, peruntukan, grade, tanggal_produksi, butuh_pendingin, berprestasi
-        $khusus = match ($tipe) {
-            'individual' => [
-                't.harga as harga', DB::raw("'ekor' as satuan"), DB::raw('1 as stok'), 't.peruntukan as peruntukan',
-                DB::raw('NULL as grade'), DB::raw('NULL as tanggal_produksi'), DB::raw('0 as butuh_pendingin'), DB::raw("$prestasi as berprestasi"),
-            ],
-            'batch' => [
-                't.harga_per_satuan as harga', 't.satuan as satuan', DB::raw('(t.stok_tersedia - t.stok_ditahan) as stok'),
-                't.peruntukan as peruntukan', DB::raw('NULL as grade'), DB::raw('NULL as tanggal_produksi'), DB::raw('0 as butuh_pendingin'), DB::raw('0 as berprestasi'),
-            ],
-            'produk' => [
-                't.harga_per_satuan as harga', 't.satuan as satuan', DB::raw('(t.stok_tersedia - t.stok_ditahan) as stok'),
-                DB::raw('NULL as peruntukan'), 't.grade_kualitas as grade', 't.tanggal_produksi as tanggal_produksi', 't.butuh_pendingin as butuh_pendingin', DB::raw('0 as berprestasi'),
-            ],
-        };
-
-        match ($tipe) {
-            'individual' => $q->where('t.status', 'tersedia'),
-            'batch'      => $q->whereRaw('t.stok_tersedia - t.stok_ditahan > 0'),
-            'produk'     => $q->where('t.status', 'aktif')
-                ->whereRaw('t.stok_tersedia - t.stok_ditahan > 0')
-                ->where(fn ($w) => $w->whereNull('t.tanggal_kadaluwarsa')
-                    ->orWhere('t.tanggal_kadaluwarsa', '>=', today()->toDateString())),
-        };
-
-        return $q->select(array_merge([
-            't.id as id', 't.nama as nama', 't.foto_utama as foto', 't.created_at as created_at',
-            'p.kota_kabupaten as kota', 'p.provinsi as provinsi', DB::raw("'$tipe' as tipe"),
-        ], $khusus))
-            ->orderByDesc('t.created_at')
-            ->limit($batas)
-            ->get();
-    }
 }

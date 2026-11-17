@@ -10,7 +10,7 @@
     $kelompokAktif = $f['kelompok'] ?? '';
     $urutAktif = $f['urut'] ?? 'terbaru';
 
-    $filterAktif = collect(['q', 'kelompok', 'jenis', 'peruntukan', 'harga_min', 'harga_maks', 'berprestasi', 'kesegaran', 'provinsi', 'kota', 'kecamatan', 'satuan'])
+    $filterAktif = collect(['q', 'kelompok', 'jenis', 'peruntukan', 'harga_min', 'harga_maks', 'berprestasi', 'kesegaran', 'provinsi', 'kota', 'satuan'])
         ->contains(fn ($k) => ! empty($f[$k]));
 
     $labelPeruntukan = ['bibit' => 'Bibit', 'pembesaran' => 'Pembesaran', 'siap_potong' => 'Siap potong', 'indukan_kontes' => 'Indukan/kontes'];
@@ -134,34 +134,40 @@
             {{-- Wilayah peternak --}}
             <section class="mt-[0.86rem]">
                 <p class="{{ $judulFilter }}">Wilayah peternak</p>
+
                 <div class="mt-[0.7rem] space-y-2.5">
                     <div class="relative">
-                        <select name="provinsi" class="{{ $kotakSelect }} {{ empty($f['provinsi']) ? 'text-[#9AA093]' : 'font-medium' }}"
-                                onchange="this.form.kota.value=''; this.form.kecamatan.value=''; this.form.submit()">
+                        <select
+                            id="filter-provinsi"
+                            name="provinsi"
+                            class="{{ $kotakSelect }} {{ empty($f['provinsi']) ? 'text-[#9AA093]' : 'font-medium' }}"
+                        >
                             <option value="">Semua provinsi</option>
                             @foreach ($provinsiOptions as $opt)
-                                <option value="{{ $opt }}" @selected(($f['provinsi'] ?? '') === $opt)>{{ $opt }}</option>
+                                <option value="{{ $opt }}" @selected(($f['provinsi'] ?? '') === $opt)>
+                                    {{ $opt }}
+                                </option>
                             @endforeach
                         </select>
+
                         <x-ikon nama="chevron" class="pointer-events-none absolute right-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#6B7265]" />
                     </div>
+
                     <div class="relative">
-                        <select name="kota" @disabled($kotaOptions->isEmpty()) class="{{ $kotakSelect }} {{ empty($f['kota']) ? 'text-[#9AA093]' : 'font-medium' }}"
-                                onchange="this.form.kecamatan.value=''; this.form.submit()">
+                        <select
+                            id="filter-kota"
+                            name="kota"
+                            @disabled($kotaOptions->isEmpty())
+                            class="{{ $kotakSelect }} {{ empty($f['kota']) ? 'text-[#9AA093]' : 'font-medium' }}"
+                        >
                             <option value="">Semua kota/kabupaten</option>
                             @foreach ($kotaOptions as $opt)
-                                <option value="{{ $opt }}" @selected(($f['kota'] ?? '') === $opt)>{{ $opt }}</option>
+                                <option value="{{ $opt }}" @selected(($f['kota'] ?? '') === $opt)>
+                                    {{ $opt }}
+                                </option>
                             @endforeach
                         </select>
-                        <x-ikon nama="chevron" class="pointer-events-none absolute right-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#6B7265]" />
-                    </div>
-                    <div class="relative">
-                        <select name="kecamatan" @disabled($kecamatanOptions->isEmpty()) class="{{ $kotakSelect }} {{ empty($f['kecamatan']) ? 'text-[#9AA093]' : 'font-medium' }}">
-                            <option value="">Semua kecamatan</option>
-                            @foreach ($kecamatanOptions as $opt)
-                                <option value="{{ $opt }}" @selected(($f['kecamatan'] ?? '') === $opt)>{{ $opt }}</option>
-                            @endforeach
-                        </select>
+
                         <x-ikon nama="chevron" class="pointer-events-none absolute right-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#6B7265]" />
                     </div>
                 </div>
@@ -223,7 +229,7 @@
                         @if (isset($f['harga_min']) || isset($f['harga_maks']))
                             <li class="flex gap-2"><x-ikon nama="check" class="mt-0.5 h-4 w-4 shrink-0 text-[#2E5B2A]" sw="2.4" /> Perluas rentang harga.</li>
                         @endif
-                        @if (! empty($f['provinsi']) || ! empty($f['kota']) || ! empty($f['kecamatan']))
+                        @if (! empty($f['provinsi']) || ! empty($f['kota']))
                             <li class="flex gap-2"><x-ikon nama="check" class="mt-0.5 h-4 w-4 shrink-0 text-[#2E5B2A]" sw="2.4" /> Pilih wilayah yang lebih luas, misalnya semua kota/kabupaten.</li>
                         @endif
                         @if (! empty($f['q']))
@@ -267,3 +273,31 @@
     <form id="form-keranjang" method="POST" action="{{ route('buyer.keranjang.tambah') }}">@csrf</form>
 @endif
 @endsection
+
+@push('scripts')
+<script>
+    const kotaPerProvinsi = @json($lokasiPerProvinsi);
+    const provinsiSelect = document.getElementById('filter-provinsi');
+    const kotaSelect = document.getElementById('filter-kota');
+
+    function isiDaftarKota(provinsi, kotaTerpilih = '') {
+        const daftarKota = kotaPerProvinsi[provinsi] || [];
+
+        kotaSelect.replaceChildren(new Option('Semua kota/kabupaten', ''));
+
+        daftarKota.forEach(function (kota) {
+            kotaSelect.add(new Option(kota, kota));
+        });
+
+        kotaSelect.disabled = daftarKota.length === 0;
+        kotaSelect.value = daftarKota.includes(kotaTerpilih) ? kotaTerpilih : '';
+    }
+
+    // Cocokkan juga nilai awal agar kota dari provinsi lain tidak tertinggal.
+    isiDaftarKota(provinsiSelect.value, kotaSelect.value);
+
+    provinsiSelect.addEventListener('change', function () {
+        isiDaftarKota(this.value);
+    });
+</script>
+@endpush
