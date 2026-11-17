@@ -118,7 +118,7 @@
             'items' => [
                 ['label' => 'Profil Toko', 'href' => route('seller.toko.profil'), 'route' => 'seller.toko.profil', 'icon' => 'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM4 21a8 8 0 0 1 16 0'],
                 ['label' => 'Mode Libur', 'href' => route('seller.toko.libur'), 'route' => 'seller.toko.libur', 'icon' => 'M12 3v18M3 12h18M5.6 5.6l12.8 12.8M18.4 5.6 5.6 18.4'],
-                ['label' => 'Verifikasi Toko', 'href' => '#', 'icon' => 'M12 3 4 6v5c0 5 3.4 8.5 8 10 4.6-1.5 8-5 8-10V6zM9 12l2 2 4-4'],
+                ['label' => 'Verifikasi Toko', 'href' => route('seller.toko.verifikasi'), 'icon' => 'M12 3 4 6v5c0 5 3.4 8.5 8 10 4.6-1.5 8-5 8-10V6zM9 12l2 2 4-4'],
             ],
         ],
         [
