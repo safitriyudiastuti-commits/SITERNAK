@@ -33,9 +33,25 @@ class SumberKatalog
         'indukan_kontes' => 'Indukan/kontes',
     ];
 
-    /** @return array{0: Collection, 1: bool} [item, apakah memakai data contoh (selalu false sekarang)] */
+    /** @return array{0: Collection, 1: bool} [daftar item, apakah memakai data contoh] */
     public static function semua(): array
     {
+        foreach ([
+            'livestock',
+            'livestock_products',
+            'livestock_media',
+            'livestock_product_media',
+            'stores',
+            'commodity_types',
+            'commodity_categories',
+        ] as $table) {
+            if (! Schema::hasTable($table)) {
+                return app()->isLocal()
+                    ? [ContohKatalog::semua(), true]
+                    : [collect(), false];
+            }
+        }
+
         $item = collect(['individual', 'batch', 'produk'])
             ->flatMap(fn (string $tipe) => self::ambil($tipe))
             ->values();
@@ -46,7 +62,9 @@ class SumberKatalog
     /** Cari satu item berdasarkan tipe + id. */
     public static function cari(string $tipe, int $id): ?object
     {
-        return self::ambil($tipe, $id)->first();
+        return self::semua()[0]->first(
+            fn ($r) => $r->tipe === $tipe && (int) $r->id === $id
+        );
     }
 
     /** Data tambahan untuk halaman detail (deskripsi, data fisik, silsilah, prestasi). */
@@ -56,6 +74,18 @@ class SumberKatalog
             'deskripsi' => null, 'ras' => null, 'kelamin' => null, 'umur' => null, 'berat' => null,
             'galeri' => [], 'induk' => null, 'pejantan' => null, 'prestasi' => [],
         ];
+
+        if (app()->isLocal() && (
+            ! Schema::hasTable('livestock')
+            || ! Schema::hasTable('livestock_products')
+            || ! Schema::hasTable('livestock_media')
+            || ! Schema::hasTable('livestock_product_media')
+            || ! Schema::hasTable('stores')
+            || ! Schema::hasTable('commodity_types')
+            || ! Schema::hasTable('commodity_categories')
+        )) {
+            return array_merge($dasar, ContohKatalog::detail($r));
+        }
 
         try {
             if ($r->tipe === 'produk') {
