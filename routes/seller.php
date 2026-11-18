@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Seller\ContestHistoryController;
 use App\Http\Controllers\Seller\DashboardController;
+use App\Http\Controllers\Seller\EarningController;
 use App\Http\Controllers\Seller\LivestockController;
 use App\Http\Controllers\Seller\LivestockProductController;
 use App\Http\Controllers\Seller\OrderController;
@@ -19,6 +20,8 @@ Route::middleware('auth')->prefix('seller')->name('seller.')->group(function () 
 
     // Hanya untuk peternak yang sudah disetujui
     Route::middleware('seller.active')->group(function () {
+        Route::get('penghasilan', [EarningController::class, 'index'])->name('penghasilan.index');
+        Route::get('penghasilan/ekspor', [EarningController::class, 'export'])->name('penghasilan.export');
         Route::get('penilaian', [ReviewController::class, 'index'])->name('penilaian.index');
         Route::post('penilaian/{review}/balas', [ReviewController::class, 'reply'])
             ->whereNumber('review')
