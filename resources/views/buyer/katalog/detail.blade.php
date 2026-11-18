@@ -20,7 +20,16 @@
     $prestasi = $d['prestasi'] ?? [];
     $berprestasi = $r->berprestasi || count($prestasi) > 0;
     $ras = $d['ras'] ?? \Illuminate\Support\Str::words($r->nama, 2, '');
-    $jumlahFoto = max(1, count($d['galeri'] ?? []));
+    $fotoGaleri = collect($d['galeri'] ?? [])
+        ->filter()
+        ->map(fn ($foto) => asset('storage/' . ltrim($foto, '/')))
+        ->values();
+
+    if ($fotoGaleri->isEmpty() && $r->foto) {
+        $fotoGaleri->push(asset('storage/' . ltrim($r->foto, '/')));
+    }
+
+    $jumlahFoto = max(1, $fotoGaleri->count());
 
     $tgl = fn ($t) => $t
         ? \Illuminate\Support\Carbon::parse($t)->translatedFormat('d F Y')
@@ -110,9 +119,10 @@ $urlPesan = $ke('buyer.pemesanan.create', [    'tipe' => $r->tipe,
 
         {{-- Foto utama --}}
         <div class="relative">
-            @if ($r->foto)
+            @if ($fotoGaleri->isNotEmpty())
                 <img
-                    src="{{ asset('storage/' . $r->foto) }}"
+                    id="foto-utama"
+                    src="{{ $fotoGaleri->first() }}"
                     alt="{{ $r->nama }}"
                     class="h-[27.5rem] w-full rounded-2xl object-cover"
                 >
@@ -127,36 +137,38 @@ $urlPesan = $ke('buyer.pemesanan.create', [    'tipe' => $r->tipe,
 
             <div class="absolute left-3.5 top-3.5 flex gap-1.5">
                 @foreach ($lencana as [$teks, $warna])
-                    <span class="{{ $pill }} {{ $warna }}">
-                        {{ $teks }}
-                    </span>
+                    <span class="{{ $pill }} {{ $warna }}">{{ $teks }}</span>
                 @endforeach
             </div>
 
-            <span class="absolute right-3.5 top-3.5 flex h-6 w-[3.25rem] items-center justify-center rounded-full bg-[#1C2118] text-[0.71875rem] font-semibold text-white">
-                1 / {{ $jumlahFoto }}
-            </span>
+            @if ($fotoGaleri->isNotEmpty())
+                <span
+                    id="nomor-foto"
+                    class="absolute right-3.5 top-3.5 flex h-6 items-center justify-center rounded-full bg-[#1C2118] px-3 text-[0.71875rem] font-semibold text-white"
+                >1 / {{ $fotoGaleri->count() }}</span>
+            @endif
         </div>
 
-        {{-- Foto kecil + video --}}
-        <div class="mt-4 grid grid-cols-4 gap-3">
-            @foreach ([0, 1, 2] as $i)
-                <x-ilustrasi
-                    :r="$r"
-                    class="h-[5.75rem] rounded-xl {{ $i === 0 ? 'ring-[2.5px] ring-inset ring-[#2E5B2A]' : '' }}"
-                    ikon="h-10 w-10"
-                    :sw="1.3"
-                />
-            @endforeach
-
-            <div class="flex h-[5.75rem] items-center justify-center rounded-xl bg-[#1C2118]/45">
-                <span class="flex h-9 w-9 items-center justify-center rounded-full bg-white text-[#1F421C]">
-                    <svg viewBox="0 0 24 24" class="h-[0.875rem] w-[0.875rem]" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round">
-                        <path d="M8 5l11 7-11 7z"/>
-                    </svg>
-                </span>
+        {{-- Thumbnail mengikuti jumlah foto produk --}}
+        @if ($fotoGaleri->isNotEmpty())
+            <div class="mt-4 flex gap-3 overflow-x-auto">
+                @foreach ($fotoGaleri as $index => $foto)
+                    <button
+                        type="button"
+                        data-foto="{{ $foto }}"
+                        data-nomor="{{ $index + 1 }}"
+                        class="thumbnail-foto h-[5.75rem] w-[5.75rem] shrink-0 overflow-hidden rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2E5B2A] {{ $index === 0 ? 'ring-[2.5px] ring-inset ring-[#2E5B2A]' : '' }}"
+                        aria-label="Tampilkan foto {{ $index + 1 }}"
+                    >
+                        <img
+                            src="{{ $foto }}"
+                            alt="Foto {{ $index + 1 }} {{ $r->nama }}"
+                            class="h-full w-full object-cover"
+                        >
+                    </button>
+                @endforeach
             </div>
-        </div>
+        @endif
 
         {{-- Deskripsi --}}
         <section class="mt-6 rounded-[0.875rem] border border-[#E4E4DC] bg-white p-5">
@@ -450,5 +462,32 @@ $urlPesan = $ke('buyer.pemesanan.create', [    'tipe' => $r->tipe,
         </section>
     </div>
 @endif
+
+@push('scripts')
+<script>
+    document.querySelectorAll('.thumbnail-foto').forEach(function (thumbnail) {
+        thumbnail.addEventListener('click', function () {
+            const fotoUtama = document.getElementById('foto-utama');
+            const nomorFoto = document.getElementById('nomor-foto');
+
+            if (!fotoUtama) return;
+
+            fotoUtama.src = thumbnail.dataset.foto;
+
+            if (nomorFoto) {
+                nomorFoto.textContent =
+                    thumbnail.dataset.nomor + ' / ' +
+                    document.querySelectorAll('.thumbnail-foto').length;
+            }
+
+            document.querySelectorAll('.thumbnail-foto').forEach(function (item) {
+                item.classList.remove('ring-[2.5px]', 'ring-inset', 'ring-[#2E5B2A]');
+            });
+
+            thumbnail.classList.add('ring-[2.5px]', 'ring-inset', 'ring-[#2E5B2A]');
+        });
+    });
+</script>
+@endpush
 
 @endsection
