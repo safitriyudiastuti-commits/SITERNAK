@@ -108,7 +108,7 @@
         [
             'title' => 'KEUANGAN',
             'items' => [
-                ['label' => 'Penghasilan Saya', 'href' => '#', 'icon' => 'M12 2v20M17 6.5c0-1.7-2.2-3-5-3S7 4.8 7 6.5 9.2 9 12 9s5 1.3 5 3-2.2 3-5 3-5 1.3-5 3 2.2 3 5 3 5-1.3 5-3'],
+                ['label' => 'Penghasilan Saya', 'href' => route('seller.penghasilan.index'), 'route' => 'seller.penghasilan.*', 'icon' => 'M12 2v20M17 6.5c0-1.7-2.2-3-5-3S7 4.8 7 6.5 9.2 9 12 9s5 1.3 5 3-2.2 3-5 3-5 1.3-5 3 2.2 3 5 3 5-1.3 5-3'],
                 ['label' => 'Saldo Penjual', 'href' => '#', 'icon' => 'M3 7h18v13H3zM3 7l2-4h14l2 4M16 13h5'],
                 ['label' => 'Laporan Keuangan', 'href' => '#', 'icon' => 'M5 3h14v18H5zM8 8h8M8 12h8M8 16h5'],
             ],
