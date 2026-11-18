@@ -6,17 +6,38 @@ use App\Enums\StoreStatus;
 use App\Http\Controllers\Controller;
 use App\Models\Store;
 use App\Support\SumberKatalog;
+use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 
 /** Halaman toko peternak yang dilihat pembeli (dibuka dari kartu peternak di detail produk). */
 class TokoController extends Controller
 {
-    public function show(Store $store)
+    public function show(Request $request, Store $store)
     {
-        // Hanya toko yang sudah diverifikasi admin yang boleh dibuka publik.
         abort_unless($store->status === StoreStatus::Active, 404);
 
         [$semua] = SumberKatalog::semua();
-        $items = $semua->where('penjual_id', $store->id)->sortByDesc('created_at')->values();
+
+        $items = $semua
+            ->where('penjual_id', $store->id)
+            ->sortByDesc('created_at')
+            ->values();
+
+        $q = trim((string) $request->query('q', ''));
+
+        if ($q !== '') {
+            $kataKunci = Str::lower($q);
+
+            $items = $items->filter(function ($item) use ($kataKunci) {
+                $teks = Str::lower(implode(' ', array_filter([
+                    $item->nama ?? '',
+                    $item->jenis ?? '',
+                    $item->kategori ?? '',
+                ])));
+
+                return Str::contains($teks, $kataKunci);
+            })->values();
+        }
 
         return view('buyer.toko.show', [
             'store' => $store,
@@ -24,6 +45,7 @@ class TokoController extends Controller
             'hasil' => $items->where('kelompok', 'hasil_ternak')->values(),
             'jumlah' => $items->count(),
             'libur' => $store->isOnVacation(),
+            'q' => $q,
         ]);
     }
 }

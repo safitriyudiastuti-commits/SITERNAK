@@ -83,7 +83,13 @@
         <span class="text-[1.0625rem] font-extrabold text-[#1F421C]">SITERNAK</span>
     </a>
 
-    <form method="GET" action="{{ $ke('buyer.katalog.index') }}" class="relative w-[35rem]">
+    <form
+        method="GET"
+        action="{{ request()->routeIs('buyer.toko.show')
+            ? route('buyer.toko.show', ['store' => request()->route('store')])
+            : $ke('buyer.katalog.index') }}"
+        class="relative w-[35rem]">
+
         <x-ikon nama="search" class="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-[#3F372E]" />
 
         <input
