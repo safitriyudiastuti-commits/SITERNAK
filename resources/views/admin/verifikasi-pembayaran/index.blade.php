@@ -4,8 +4,11 @@
 
 @section('content')
     <div class="page-head">
-        <h1>Verifikasi pembayaran transfer</h1>
-        <p>Cocokkan nominal dan bukti transfer dengan rekening tujuan. Batas verifikasi 1×24 jam.</p>
+        <h1>Verifikasi pembayaran</h1>
+        <p>
+            Periksa pembayaran pembeli melalui transfer bank atau QRIS DEMO.
+            Pastikan nominal sesuai sebelum memberikan keputusan.
+        </p>
     </div>
 
     @include('admin.verifikasi-pembayaran._tabs')
@@ -14,9 +17,11 @@
         <aside>
             @include('admin.verifikasi-pembayaran._list')
         </aside>
+
         <section>
             <div class="empty-detail">
-                Pilih satu pembayaran di sebelah kiri untuk memeriksa bukti transfernya.
+                Pilih satu pembayaran di sebelah kiri untuk melihat
+                rincian dan melakukan verifikasi.
             </div>
         </section>
     </div>

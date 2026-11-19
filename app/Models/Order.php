@@ -61,9 +61,14 @@ class Order extends Model
         return $this->belongsTo(LivestockProduct::class);
     }
 
-    public function review(): HasOne
+       public function review(): HasOne
     {
         return $this->hasOne(Review::class);
+    }
+
+    public function payment(): HasOne
+    {
+        return $this->hasOne(Payment::class, 'order_id');
     }
 
     public function statusHistories(): HasMany

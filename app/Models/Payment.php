@@ -35,9 +35,14 @@ class Payment extends Model
         ];
     }
 
-    public function buyer(): BelongsTo
+      public function buyer(): BelongsTo
     {
         return $this->belongsTo(User::class, 'user_id');
+    }
+
+    public function order(): BelongsTo
+    {
+        return $this->belongsTo(Order::class, 'order_id');
     }
 
     public function decider(): BelongsTo

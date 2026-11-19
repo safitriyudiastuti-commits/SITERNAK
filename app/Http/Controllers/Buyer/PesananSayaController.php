@@ -44,18 +44,20 @@ class PesananSayaController extends Controller
     /**
      * Menampilkan detail dan riwayat pesanan.
      */
-    public function show($id)
-    {
-        $pesanan = Order::with([
-            'store',
-            'livestock',
-            'statusHistories.actor',
-        ])
-            ->where('buyer_id', Auth::id())
-            ->findOrFail($id);
+  public function show($id)
+{
+    $pesanan = Order::with([
+        'store',
+        'livestock',
+        'payment',
+        'review',
+        'statusHistories.actor',
+    ])
+        ->where('buyer_id', Auth::id())
+        ->findOrFail($id);
 
-        return view('buyer.pesanan.show', compact('pesanan'));
-    }
+    return view('buyer.pesanan.show', compact('pesanan'));
+}
 
     /**
      * Mengonfirmasi pesanan telah diterima.

@@ -4,6 +4,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Buyer\KatalogController;
 use App\Http\Controllers\Buyer\PemesananController;
 use App\Http\Controllers\Buyer\UlasanController;
+use App\Http\Controllers\Buyer\PembayaranController;
 
 // Halaman depan.
 Route::get('/', function () {
@@ -75,3 +76,8 @@ Route::middleware('auth')
     ->post('/pesanan/{order}/ulasan', [UlasanController::class, 'store'])
     ->whereNumber('order')
     ->name('buyer.ulasan.store');
+
+Route::middleware('auth')
+    ->post('/pesanan/{order}/unggah-bukti', [PembayaranController::class, 'unggahBukti'])
+    ->whereNumber('order')
+    ->name('buyer.pembayaran.unggah-bukti');
