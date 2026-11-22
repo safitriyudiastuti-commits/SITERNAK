@@ -31,6 +31,7 @@ Route::middleware('auth')->prefix('seller')->name('seller.')->group(function () 
         Route::get('pesanan/{order}', [OrderController::class, 'show'])->whereNumber('order')->name('pesanan.show');
         Route::post('pesanan/{order}/confirm', [OrderController::class, 'confirm'])->whereNumber('order')->name('pesanan.confirm');
         Route::post('pesanan/{order}/reject', [OrderController::class, 'reject'])->whereNumber('order')->name('pesanan.reject');
+        Route::post('pesanan/{order}/konfirmasi-cod', [OrderController::class, 'confirmCod'])->whereNumber('order')->name('pesanan.konfirmasi-cod');
 
         Route::get('hasil-ternak', [LivestockProductController::class, 'index'])->name('hasil-ternak.index');
         Route::get('hasil-ternak/create', [LivestockProductController::class, 'create'])->name('hasil-ternak.create');

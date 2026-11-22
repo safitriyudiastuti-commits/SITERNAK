@@ -13,6 +13,7 @@ use App\Models\Store;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Notification;
 use RuntimeException;
 use Tests\TestCase;
 
@@ -247,6 +248,96 @@ class OrderTest extends TestCase
             'status' => 'dikonfirmasi',
             'keterangan' => 'Penjual mengonfirmasi pesanan.',
         ]);
+    }
+
+    public function test_seller_confirms_cod_payment_without_changing_order_status_and_notifies_buyer(): void
+    {
+        Notification::fake();
+        [$seller, $store] = $this->sellerWithStore();
+        $order = $this->createOrder($store, 'dikonfirmasi', 'ORD-COD-PAID', null, 'belum', 'cod');
+
+        $this->actingAs($seller)
+            ->get(route('seller.pesanan.show', $order))
+            ->assertOk()
+            ->assertSee('Tandai Sudah Dibayar (COD)')
+            ->assertSee(route('seller.pesanan.konfirmasi-cod', $order), false)
+            ->assertSee('id="cod-payment-dialog"', false);
+
+        $this->actingAs($seller)
+            ->post(route('seller.pesanan.konfirmasi-cod', $order))
+            ->assertRedirect(route('seller.pesanan.show', $order))
+            ->assertSessionHas('success');
+
+        $this->assertDatabaseHas('orders', [
+            'id' => $order->id,
+            'status' => 'dikonfirmasi',
+            'status_bayar' => 'sah',
+        ]);
+        $this->assertDatabaseHas('order_status_histories', [
+            'order_id' => $order->id,
+            'actor_id' => $seller->id,
+            'status' => 'dikonfirmasi',
+            'keterangan' => 'Pembayaran COD dikonfirmasi peternak',
+        ]);
+        Notification::assertSentTo($order->buyer, \App\Notifications\CodPaymentConfirmed::class);
+    }
+
+    public function test_cod_payment_confirmation_rejects_invalid_order_state_and_other_store(): void
+    {
+        Notification::fake();
+        [$seller, $store] = $this->sellerWithStore();
+        [, $otherStore] = $this->sellerWithStore();
+        $notCod = $this->createOrder($store, 'dikonfirmasi', 'ORD-NOT-COD', null, 'belum', 'transfer_bank');
+        $notConfirmed = $this->createOrder($store, 'menunggu_konfirmasi', 'ORD-NOT-CONFIRMED', null, 'belum', 'cod');
+        $alreadyPaid = $this->createOrder($store, 'dikonfirmasi', 'ORD-ALREADY-PAID', null, 'sah', 'cod');
+        $otherStoreOrder = $this->createOrder($otherStore, 'dikonfirmasi', 'ORD-OTHER-COD', null, 'belum', 'cod');
+
+        foreach ([$notCod, $notConfirmed, $alreadyPaid] as $order) {
+            $this->actingAs($seller)->post(route('seller.pesanan.konfirmasi-cod', $order))->assertStatus(409);
+        }
+        $this->actingAs($seller)->post(route('seller.pesanan.konfirmasi-cod', $otherStoreOrder))->assertNotFound();
+
+        $this->assertDatabaseHas('orders', ['id' => $notCod->id, 'status_bayar' => 'belum']);
+        $this->assertDatabaseHas('orders', ['id' => $notConfirmed->id, 'status_bayar' => 'belum']);
+        $this->assertDatabaseHas('orders', ['id' => $alreadyPaid->id, 'status_bayar' => 'sah']);
+        $this->assertDatabaseMissing('order_status_histories', ['order_id' => $notCod->id, 'keterangan' => 'Pembayaran COD dikonfirmasi peternak']);
+        Notification::assertNothingSent();
+    }
+
+    public function test_cod_payment_confirmation_cannot_be_repeated(): void
+    {
+        Notification::fake();
+        [$seller, $store] = $this->sellerWithStore();
+        $order = $this->createOrder($store, 'dikonfirmasi', 'ORD-COD-ONCE', null, 'belum', 'cod');
+
+        $this->actingAs($seller)->post(route('seller.pesanan.konfirmasi-cod', $order))->assertRedirect();
+        $this->actingAs($seller)->post(route('seller.pesanan.konfirmasi-cod', $order))->assertStatus(409);
+
+        $this->assertSame(1, OrderStatusHistory::query()->where('order_id', $order->id)->where('keterangan', 'Pembayaran COD dikonfirmasi peternak')->count());
+        Notification::assertSentTo($order->buyer, \App\Notifications\CodPaymentConfirmed::class);
+        Notification::assertSentToTimes($order->buyer, \App\Notifications\CodPaymentConfirmed::class, 1);
+    }
+
+    public function test_cod_payment_confirmation_rolls_back_if_history_cannot_be_created(): void
+    {
+        Notification::fake();
+        [$seller, $store] = $this->sellerWithStore();
+        $order = $this->createOrder($store, 'dikonfirmasi', 'ORD-COD-ROLLBACK', null, 'belum', 'cod');
+
+        OrderStatusHistory::creating(static function (): void {
+            throw new RuntimeException('History write failed.');
+        });
+        $this->withoutExceptionHandling();
+
+        try {
+            $this->actingAs($seller)->post(route('seller.pesanan.konfirmasi-cod', $order));
+            $this->fail('The failed history write should bubble up.');
+        } catch (RuntimeException $exception) {
+            $this->assertSame('History write failed.', $exception->getMessage());
+        }
+
+        $this->assertDatabaseHas('orders', ['id' => $order->id, 'status' => 'dikonfirmasi', 'status_bayar' => 'belum']);
+        Notification::assertNothingSent();
     }
 
     public function test_reject_requires_a_reason_and_records_rejection_history(): void
