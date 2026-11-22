@@ -119,6 +119,38 @@
         </section>
     @endif
 
+    @if ($order->status === 'dikonfirmasi' && $order->status_bayar === 'belum' && $order->metode_bayar === 'cod')
+        <section class="rounded-xl border border-gray-200 bg-white p-5">
+            <h2 class="text-base font-bold text-gray-900">Konfirmasi pembayaran COD</h2>
+            <p class="mt-1 text-sm text-gray-500">Konfirmasikan setelah pembayaran diterima dari pembeli.</p>
+            <button type="button" data-open-cod-confirm="cod-payment-dialog"
+                    class="mt-4 rounded-lg bg-[#2d5a27] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#234a1f]">
+                Tandai Sudah Dibayar (COD)
+            </button>
+        </section>
+
+        <dialog id="cod-payment-dialog" class="m-auto w-[min(28rem,calc(100%-2rem))] rounded-2xl p-0 shadow-xl backdrop:bg-black/40">
+            <form method="POST" action="{{ route('seller.pesanan.konfirmasi-cod', $order->id) }}" class="p-5">
+                @csrf
+                <h2 class="text-base font-bold text-gray-900">Konfirmasi pembayaran COD?</h2>
+                <p class="mt-2 text-sm text-gray-600">Status pembayaran pesanan #{{ $order->nomor_order }} akan ditandai sah.</p>
+                <div class="mt-5 flex justify-end gap-2">
+                    <button type="button" data-close-cod-confirm="cod-payment-dialog" class="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Batal</button>
+                    <button type="submit" class="rounded-lg bg-[#2d5a27] px-4 py-2 text-sm font-semibold text-white hover:bg-[#234a1f]">Konfirmasi pembayaran</button>
+                </div>
+            </form>
+        </dialog>
+    @endif
+
+    @if ($order->status === 'dikonfirmasi' && $order->status_bayar === 'sah')
+        <section class="rounded-xl border border-emerald-200 bg-emerald-50 p-5">
+            <h2 class="text-base font-bold text-emerald-900">Pembayaran telah sah</h2>
+            <button type="button" class="mt-4 rounded-lg bg-[#2d5a27] px-4 py-2.5 text-sm font-semibold text-white">
+                Siapkan pengiriman
+            </button>
+        </section>
+    @endif
+
     <section class="rounded-xl border border-gray-200 bg-white p-5">
         <h2 class="text-base font-bold text-gray-900">Riwayat status</h2>
         @forelse ($order->statusHistories as $history)
@@ -139,4 +171,14 @@
         @endforelse
     </section>
 </div>
+<script>
+    (() => {
+        document.querySelectorAll('[data-open-cod-confirm]').forEach((button) => {
+            button.addEventListener('click', () => document.getElementById(button.dataset.openCodConfirm)?.showModal());
+        });
+        document.querySelectorAll('[data-close-cod-confirm]').forEach((button) => {
+            button.addEventListener('click', () => document.getElementById(button.dataset.closeCodConfirm)?.close());
+        });
+    })();
+</script>
 @endsection

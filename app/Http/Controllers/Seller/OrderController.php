@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Order;
 use App\Models\OrderStatusHistory;
 use App\Models\Store;
+use App\Notifications\CodPaymentConfirmed;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -162,6 +163,44 @@ class OrderController extends Controller
         return redirect()
             ->route('seller.pesanan.show', $orderId)
             ->with('success', 'Pesanan berhasil ditolak.');
+    }
+
+    public function confirmCod(Request $request, int $order): RedirectResponse
+    {
+        $store = $this->activeStore($request);
+
+        $orderId = DB::transaction(function () use ($request, $store, $order): int {
+            $order = Order::query()
+                ->where('store_id', $store->id)
+                ->lockForUpdate()
+                ->findOrFail($order);
+
+            abort_unless(
+                $order->metode_bayar === 'cod'
+                    && $order->status === 'dikonfirmasi'
+                    && $order->status_bayar === 'belum',
+                409,
+                'Pembayaran COD ini tidak dapat dikonfirmasi.'
+            );
+
+            $order->update(['status_bayar' => 'sah']);
+
+            OrderStatusHistory::create([
+                'order_id' => $order->id,
+                'actor_id' => $request->user()->id,
+                'status' => $order->status,
+                'keterangan' => 'Pembayaran COD dikonfirmasi peternak',
+                'created_at' => now(),
+            ]);
+
+            $order->buyer->notify(new CodPaymentConfirmed($order));
+
+            return $order->id;
+        });
+
+        return redirect()
+            ->route('seller.pesanan.show', $orderId)
+            ->with('success', 'Pembayaran COD berhasil dikonfirmasi.');
     }
 
     private function transition(
